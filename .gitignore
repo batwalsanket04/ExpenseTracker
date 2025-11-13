@@ -1,0 +1,102 @@
+# --------------------------------------------------
+# General
+# --------------------------------------------------
+node_modules/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# --------------------------------------------------
+# Frontend (React / Vite / Next.js)
+# --------------------------------------------------
+# Build output
+/.vite
+/.next
+/.nuxt
+/out
+/.cache
+coverage/
+vite.config.ts.timestamp*
+*.tsbuildinfo
+
+# Local dev files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --------------------------------------------------
+# Backend (Node / Express / NestJS)
+# --------------------------------------------------
+/logs
+*.log
+pids
+*.pid
+*.seed
+*.pid.lock
+/lib
+/tmp
+/temp
+/uploads
+/public/uploads
+/database.sqlite
+
+# --------------------------------------------------
+# OS Specific
+# --------------------------------------------------
+Thumbs.db
+ehthumbs.db
+Icon?
+Desktop.ini
+
+# --------------------------------------------------
+# Optional (if using Docker, VSCode, etc.)
+# --------------------------------------------------
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# --------------------------------------------------
+# Environment & Secrets
+# --------------------------------------------------
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# --------------------------------------------------
+# Misc
+# --------------------------------------------------
+# Test outputs
+coverage/
+test-output/
+jest-html-reporters-*.html
+
+# Cache
+.cache/
+.cache-loader/
+.parcel-cache/
