@@ -16,7 +16,7 @@ const Sidebar = () => {
 
   const menuItems = [
     { icon: <Home size={18} />, label: "Dashboard", path: "/dashboard/overview" },
-    { icon: <PlusCircle size={18} />, label: "Add", path: "/dashboard/add-expense" },
+    { icon: <PlusCircle size={18} />, label: "Add Transaction", path: "/dashboard/add-expense" },
     { icon: <List size={18} />, label: "Show Expenses", path: "/dashboard/show-expenses" },
     { icon: <BarChart2 size={18} />, label: "Reports", path: "/dashboard/reports" },
     { icon: <Settings size={18} />, label: "Settings", path: "/dashboard/settings" },
@@ -24,7 +24,7 @@ const Sidebar = () => {
 
   return (
     <div
-      className={`h-screen bg-indigo-700 text-white flex flex-col justify-between shadow-lg transition-all duration-300 ${
+      className={`min-h-full max-h-full  bg-indigo-700 text-white flex flex-col  justify-between shadow-lg transition-all duration-300 ${
         isOpen ? "w-64" : "w-20"
       } rounded-2xl`}
     >
@@ -50,7 +50,7 @@ const Sidebar = () => {
               <NavLink
                 to={item.path}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 w-full px-4 py-2 rounded-lg transition ${
+                  `flex items-center gap-3 w-full h-full px-4 py-2 rounded-lg transition ${
                     isActive ? "bg-indigo-600" : "hover:bg-indigo-600"
                   }`
                 }

@@ -1,50 +1,70 @@
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 
 const AddExpense = () => {
-  const [data,setData]=useState({
-    title:"",
-    amount:"",
-    category:"",
-    date:"",
-    note:""
-  })
+  const [data, setData] = useState({
+    title: "",
+    amount: "",
+    category: "",
+    date: "",
+    note: "",
+  });
 
-  const handleForm=(e)=>{
-   const {name,value}=e.target;
-   setData({...data,[name]:value})
-  } 
+  const handleForm = (e) => {
+    const { name, value } = e.target;
+    setData({ ...data, [name]: value });
+  };
 
-  const handleSubmit=async(e)=>{
-   e.preventDefault();
-   try {
-  const userId = localStorage.getItem("userId");
-    const res=await axios.post("http://localhost:3000/api/expense/add",{...data,userId})
-    setData({ title: "", amount: "", category: "", date: "", note: "" });
-    if(res.status===200)
-    {
-      alert(res.data.message)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const userId = localStorage.getItem("userId");
+      const res = await axios.post("http://localhost:3000/api/expense/add", {
+        ...data,
+        userId,
+      });
+      setData({ title: "", amount: "", category: "", date: "", note: "" });
+
+      if (res.status === 200) {
+        alert(res.data.massege || "Expense Added Successfully!");
+      } else {
+        alert(res.data.massege || "Something Went Wrong");
+      }
+    } catch (error) {
+      console.log("Error", error);
+      alert("Error connecting to server");
     }
-    else{
-      alert(res.data.message || "Something Went Wrong")
-    }
-    
-   } catch (error) {
-    console.log("Error",error)
-    alert("Error To connect server")
-   }
-  }
-
+  };
 
   return (
-    <div className="bg-white shadow rounded-xl p-6">
-      <h2 className="text-xl font-semibold text-indigo-700 mb-4">Add Expense</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input type="text" id="title" name="title" value={data.title} onChange={(e)=>handleForm(e)} placeholder="Title" className="w-full border p-2 rounded-lg" />
-        <input type="number" id="amount" name="amount" value={data.amount} onChange={(e)=>handleForm(e)} placeholder="Amount" className="w-full border p-2 rounded-lg" />
-        <select  id="category" name="category" value={data.category} onChange={(e)=>handleForm(e)} className="w-full border p-2 rounded-lg">
-         <option value="">Select Category</option>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid md:grid-cols-2 gap-4">
+        <input
+          type="text"
+          name="title"
+          value={data.title}
+          onChange={handleForm}
+          placeholder="Expense Title"
+          className="border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none p-2.5 rounded-lg w-full"
+        />
+        <input
+          type="number"
+          name="amount"
+          value={data.amount}
+          onChange={handleForm}
+          placeholder="Amount (₹)"
+          className="border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none p-2.5 rounded-lg w-full"
+        />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <select
+          name="category"
+          value={data.category}
+          onChange={handleForm}
+          className="border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none p-2.5 rounded-lg w-full"
+        >
+          <option value="">Select Category</option>
           <option>Food</option>
           <option>Petrol</option>
           <option>Bills</option>
@@ -52,13 +72,32 @@ const AddExpense = () => {
           <option>Entertainment</option>
           <option>Other</option>
         </select>
-        <input type="date" id="date" value={data.date} onChange={(e)=>handleForm(e)} name="date" className="w-full border p-2 rounded-lg" />
-        <textarea placeholder="Note (optional)" name="note" value={data.note} onChange={(e)=>handleForm(e)} id="note" className="w-full border p-2 rounded-lg"></textarea>
-        <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
-          Add Expense
-        </button>
-      </form>
-    </div>
+
+        <input
+          type="date"
+          name="date"
+          value={data.date}
+          onChange={handleForm}
+          className="border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none p-2.5 rounded-lg w-full"
+        />
+      </div>
+
+      <textarea
+        name="note"
+        value={data.note}
+        onChange={handleForm}
+        placeholder="Add a note (optional)"
+        rows={3}
+        className="border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none p-2.5 rounded-lg w-full resize-none"
+      ></textarea>
+
+      <button
+        type="submit"
+        className="w-full bg-indigo-600 text-white py-2.5 rounded-lg hover:bg-indigo-700 transition-all duration-300 font-medium shadow-sm"
+      >
+         Add Expense
+      </button>
+    </form>
   );
 };
 

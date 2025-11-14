@@ -14,9 +14,10 @@ connection()
 
 const userRoute=require('./routes/user.route')
 const expRoute=require('./routes/expenses.route')
+const creditRoute=require('./routes/credit.route')
 
 //middleware
- app.use(express.json())
+  app.use(express.json());
  app.use(express.urlencoded({extended:true}))
 
  const cors=require('cors')
@@ -25,6 +26,7 @@ const expRoute=require('./routes/expenses.route')
 
  app.use('/api/user',userRoute)
  app.use('/api/expense',expRoute)
+ app.use('/api/credit',creditRoute)
 
  app.listen(PORT,HOST,()=>{
 

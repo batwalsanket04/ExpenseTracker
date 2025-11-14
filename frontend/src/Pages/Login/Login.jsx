@@ -23,6 +23,7 @@ const Login = () => {
       if (res.status === 200 || res.status === 201) {
         setToken(res.data.token);
         localStorage.setItem("token", res.data.token);
+        localStorage.setItem("name",res.data.user.name)
         alert("Login Successfully");
         navigate("/dashboard");
       } else {

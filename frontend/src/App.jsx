@@ -7,6 +7,7 @@ import AddExpense from './Pages/Expenses/AddExpense'
 import Navbar from './Componants/Layout/Navbar'
 import { Sidebar } from 'lucide-react'
 import Overview from './Pages/Dashboard/Overview'
+import AddTransaction from './Componants/Layout/AddTransaction/AddTransaction'
  
 
  const App = () => {
@@ -18,7 +19,7 @@ import Overview from './Pages/Dashboard/Overview'
         <Route path="/login" element={<Login/>} />
         <Route path="/dashboard" element={<Dashboard/>}>
         <Route path="/dashboard/overview"element={<Overview/>} /> 
-        <Route path="/dashboard/add-expense"element={<AddExpense/>} /> 
+        <Route path="/dashboard/add-expense"element={<AddTransaction/>} /> 
         </Route>
 
        

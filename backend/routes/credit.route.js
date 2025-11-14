@@ -1,0 +1,16 @@
+const express=require('express');
+const { AddCredit, ShowCredit, showCreditById, deleteCredit, updateCredit } = require('../controller/credit.controller');
+
+const Router=express.Router();
+
+
+Router.post("/add",AddCredit)
+Router.get("/",ShowCredit)
+Router.get("/:id",showCreditById)
+Router.delete("/:id",deleteCredit)
+Router.put("/:id",updateCredit)
+ 
+
+
+
+module.exports=Router;
