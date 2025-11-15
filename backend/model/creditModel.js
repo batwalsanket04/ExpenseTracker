@@ -1,7 +1,12 @@
 const mongoose=require('mongoose')
 
 const CreditSchema= new mongoose.Schema({
-
+  
+    userId:{
+      type:mongoose.Schema.Types.ObjectId,
+      ref:"User",
+      required:true,
+    },
     source: {
     type: String,
     required: true,  

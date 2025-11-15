@@ -17,7 +17,8 @@ const Sidebar = () => {
   const menuItems = [
     { icon: <Home size={18} />, label: "Dashboard", path: "/dashboard/overview" },
     { icon: <PlusCircle size={18} />, label: "Add Transaction", path: "/dashboard/add-expense" },
-    { icon: <List size={18} />, label: "Show Expenses", path: "/dashboard/show-expenses" },
+    { icon: <List size={18} />, label: "Show Expenses", path: "/dashboard/show-expense" },
+    { icon: <List size={18} />, label: "Show Credits", path: "/dashboard/show-credits" },
     { icon: <BarChart2 size={18} />, label: "Reports", path: "/dashboard/reports" },
     { icon: <Settings size={18} />, label: "Settings", path: "/dashboard/settings" },
   ];

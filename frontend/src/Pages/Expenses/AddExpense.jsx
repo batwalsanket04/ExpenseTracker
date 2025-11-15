@@ -16,25 +16,31 @@ const AddExpense = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const userId = localStorage.getItem("userId");
-      const res = await axios.post("http://localhost:3000/api/expense/add", {
-        ...data,
-        userId,
-      });
-      setData({ title: "", amount: "", category: "", date: "", note: "" });
+  e.preventDefault();
 
-      if (res.status === 200) {
-        alert(res.data.massege || "Expense Added Successfully!");
-      } else {
-        alert(res.data.massege || "Something Went Wrong");
-      }
-    } catch (error) {
-      console.log("Error", error);
-      alert("Error connecting to server");
-    }
-  };
+  try {
+    const userId = localStorage.getItem("userId");
+
+    const res = await axios.post("http://localhost:3000/api/expense/add", {
+      ...data,
+      userId,   // ✔ correctly sent inside body
+    });
+
+    setData({
+      title: "",
+      amount: "",
+      category: "",
+      date: "",
+      note: "",
+    });
+
+    alert(res.data.message || "Expense Added Successfully!");
+  } catch (error) {
+    console.log("Error", error);
+    alert("Error connecting to server");
+  }
+};
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">

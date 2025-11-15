@@ -5,7 +5,7 @@ const Router=express.Router();
 
 
 Router.post("/add",AddCredit)
-Router.get("/",ShowCredit)
+Router.get("/user/:userId",ShowCredit)
 Router.get("/:id",showCreditById)
 Router.delete("/:id",deleteCredit)
 Router.put("/:id",updateCredit)

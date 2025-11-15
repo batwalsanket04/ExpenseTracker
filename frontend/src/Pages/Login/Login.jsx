@@ -15,25 +15,31 @@ const Login = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    try {
-      const res = await axios.post("http://localhost:3000/api/user/login", data);
+  try {
+    const res = await axios.post("http://localhost:3000/api/user/login", data);
 
-      if (res.status === 200 || res.status === 201) {
-        setToken(res.data.token);
-        localStorage.setItem("token", res.data.token);
-        localStorage.setItem("name",res.data.user.name)
-        alert("Login Successfully");
-        navigate("/dashboard");
-      } else {
-        alert(res.data.message || "Invalid Credentials");
-      }
-    } catch (error) {
-      console.log("Error:", error.response?.data || error.message);
-      alert(error.response?.data?.message || "Error connecting to server");
+    if (res.status === 200 || res.status === 201) {
+     
+      localStorage.setItem("token", res.data.token);
+ 
+      localStorage.setItem("userId", res.data.user._id);
+      console.log("Saved userId:", res.data.user._id);
+
+      localStorage.setItem("userName", res.data.user.name);
+
+      alert("Login Successfully");
+      navigate("/dashboard");
+    } else {
+      alert(res.data.message || "Invalid Credentials");
     }
-  };
+  } catch (error) {
+    console.log("Error:", error.response?.data || error.message);
+    alert(error.response?.data?.message || "Error connecting to server");
+  }
+};
+
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 p-4">

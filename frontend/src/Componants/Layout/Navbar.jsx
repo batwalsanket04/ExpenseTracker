@@ -6,16 +6,22 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const name = localStorage.getItem("name"); 
+    const name = localStorage.getItem("userName"); 
     if (name) setUserName(name);
   }, []);
 
-  const handleLogout = () => {
-    if (window.confirm("Are you sure you want to logout?")) {
-      localStorage.clear();
-      navigate("/login");  
-    }
-  };
+ const handleLogout = () => {
+  localStorage.removeItem("userId");
+  localStorage.removeItem("userName");
+ 
+  localStorage.removeItem("token");
+
+  window.location.href = "/login";
+  localStorage.clear();
+
+};
+
+
 
   return (
     <div className="flex justify-between items-center bg-white shadow-md rounded-xl p-4 px-6 mb-8 transition-all duration-300 ml-[30px]">

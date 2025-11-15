@@ -3,11 +3,11 @@ const Credit=require('../model/creditModel')
 
 const AddCredit=async(req,res)=>{
 
-    const {source,amount,date,method,note}=req.body;
+    const {source,amount,date,method,note,userId}=req.body;
  try {
-   const credit= new Credit({source,amount,date,method,note})
+   const credit= new Credit({source,amount,date,method,note,userId})
    await credit.save();
-    res.status(200).json({success:true,message:"Credit Added",credit})
+    res.status(200).json({success:true,message:"Credit Added",data:credit})
  } catch (error) {
     console.log("Error:",error)
     res.status(500).json({ success:false, message:"Server Error"})
@@ -17,7 +17,8 @@ const AddCredit=async(req,res)=>{
  
 const ShowCredit = async (req, res) => {
   try {
-    const credits = await Credit.find();
+    const userId=req.params.userId
+    const credits = await Credit.find({userId});
     res.status(200).json({ success: true, data: credits });
   } catch (error) {
     console.error("Error:", error);
