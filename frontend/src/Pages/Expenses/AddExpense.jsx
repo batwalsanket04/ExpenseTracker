@@ -22,7 +22,7 @@ const AddExpense = () => {
   try {
     const userId = localStorage.getItem("userId");
 
-    const res = await axios.post("http://localhost:3000/api/expense/add", {
+    const res = await axios.post("https://expense-tracker-h9ng.onrender.com/api/expense/add", {
       ...data,
       userId,   // ✔ correctly sent inside body
     });
