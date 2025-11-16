@@ -20,16 +20,17 @@ const creditRoute=require('./routes/credit.route')
  app.use(express.urlencoded({extended:true}))
 
  const cors=require('cors')
- app.use(
+app.use(
   cors({
-    origin:[ "http://localhost:5173",//frontend
- " https://expensetracker-2-58w9.onrender.com",//live link frontend
-            ],
-          
+    origin: [
+      "http://localhost:5173",
+      "https://expensetracker-2-58w9.onrender.com"
+    ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
+
 
 
  app.use('/api/user',userRoute)
