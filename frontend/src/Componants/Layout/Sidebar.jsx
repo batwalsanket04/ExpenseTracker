@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   Home,
   PlusCircle,
@@ -13,6 +13,7 @@ import {
 
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(true);
+  const navigate=useNavigate()
 
 
   const handleLogout = () => {
@@ -21,8 +22,10 @@ const Sidebar = () => {
  
   localStorage.removeItem("token");
 
-  window.location.href = "/login";
+  
   localStorage.clear();
+  navigate("/login")
+
 
 };
 
