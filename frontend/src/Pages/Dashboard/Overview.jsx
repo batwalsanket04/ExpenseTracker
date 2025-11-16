@@ -14,8 +14,8 @@ const Overview = () => {
 
   const fetchData = async () => {
     try {
-      const exp = await axios.get(`http://localhost:3000/api/expense/user/${userId}`);
-      const credit = await axios.get(`http://localhost:3000/api/credit/user/${userId}`);
+      const exp = await axios.get(`https://expense-tracker-h9ng.onrender.com/api/expense/user/${userId}`);
+      const credit = await axios.get(`https://expense-tracker-h9ng.onrender.com/api/credit/user/${userId}`);
 
       const expData = exp.data;
       const creditData = credit.data.data;
