@@ -24,13 +24,18 @@ const creditRoute=require('./routes/credit.route')
  app.use(
   cors({
     origin:[ "http://localhost:5173",//frontend
-          "https://expense-tracker-h9ng.onrender.com", //backend
           "https://expensetracker-2-58w9.onrender.com"//frontend live link
            ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
+
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  next();
+});
 
 
  app.use('/api/user',userRoute)
