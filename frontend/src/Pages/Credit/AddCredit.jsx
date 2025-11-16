@@ -34,7 +34,7 @@ const AddCredit = () => {
       }
 
       const res = await axios.post(
-        "http://localhost:3000/api/credit/add",
+        "https://expense-tracker-h9ng.onrender.com/api/credit/add",
         { ...data, userId }
       );
 
