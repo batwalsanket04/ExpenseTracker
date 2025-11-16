@@ -47,7 +47,7 @@ if (!passwordRegex.test(data.password)) {
        }
    try {
     const {name,email,password}=data;
-        const res= await axios.post("http://localhost:3000/api/user/register",{name,email,password} )
+        const res= await axios.post("https://expense-tracker-h9ng.onrender.com/api/user/register",{name,email,password} )
 
         if(res.status===201)
         {
