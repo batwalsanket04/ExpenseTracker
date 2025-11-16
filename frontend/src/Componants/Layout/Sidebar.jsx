@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 const Sidebar = () => {
-  const navigate=useNavigate();
+ 
   
   const [isOpen, setIsOpen] = useState(true);
 
@@ -25,7 +25,7 @@ const Sidebar = () => {
   localStorage.removeItem("token");
   
   localStorage.clear();
-    navigate("/login")
+ 
 
 };
 
