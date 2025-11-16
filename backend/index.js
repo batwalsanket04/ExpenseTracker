@@ -3,7 +3,8 @@ require('dotenv').config();
 const express=require('express')
 const app=express()
 
-  
+
+const HOST='127.0.0.1'
 const PORT= process.env.PORT || 3000;
 
 //db Connection
@@ -20,17 +21,16 @@ const creditRoute=require('./routes/credit.route')
  app.use(express.urlencoded({extended:true}))
 
  const cors=require('cors')
-app.use(
+ app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "https://expensetracker-2-58w9.onrender.com"
-    ],
+    origin:[ "http://localhost:5173",//frontend
+          "https://expense-tracker-h9ng.onrender.com", //backend
+          "https://expensetracker-2-58w9.onrender.com"//frontend live link
+           ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
-
 
 
  app.use('/api/user',userRoute)
@@ -43,8 +43,8 @@ app.get("/",(req,res)=>{
 })
 
 
- app.listen(PORT,"0.0.0.0",()=>{
+ app.listen(PORT,HOST,()=>{
 
-    console.log(`Server Is up:${PORT}`);
+    console.log(`Server Is up:http://${HOST}:${PORT}`);
 
  })
