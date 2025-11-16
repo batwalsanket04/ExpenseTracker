@@ -7,7 +7,7 @@ const { getUser, getUserById, deleteUser, updateUser, registerUser, LoginUser } 
 Router.post("/register",registerUser)
 Router.post("/login",LoginUser)
 Router.get("/",getUser)
-Router.get("/",getUserById)
+Router.get("/:id",getUserById)
 Router.delete("/:id",deleteUser)
 Router.put("/:id",updateUser)
 
