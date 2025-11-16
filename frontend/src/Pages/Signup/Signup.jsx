@@ -1,10 +1,13 @@
 import React, { useState } from "react";
 import axios from "axios";
 import {  NavLink, useNavigate } from "react-router-dom";
+import {toast} from 'react-toastify'
 
 const Signup = () => {
     const [data,setData]=useState({name:"",email:"",password:"",Cpassword:""})
     const [error, setError] = useState("");
+
+   const nav=useNavigate();
 
     const handleForm=(e)=>{
      const {name,value}=e.target;
@@ -28,6 +31,16 @@ const Signup = () => {
     const handleSubmit=async(e)=>{
      e.preventDefault();
 
+     const passwordRegex =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+if (!passwordRegex.test(data.password)) {
+  return setError(
+    "Password must contain uppercase, lowercase, number & special character"
+  );
+}
+
+
      if(data.password!==data.Cpassword)
        {
         return setError("Please Check Password")
@@ -38,15 +51,17 @@ const Signup = () => {
 
         if(res.status===201)
         {
-            alert(res.data.message)
+           toast.success(res.data.message)
+            nav("/login")
+
         }
         else
         {
-            alert(res.data.message)||"Something Went Wrong"
+            toast.error(res.data.message)||"Something Went Wrong"
         }
    } catch (error) {
        console.log("Error:",error)
-       alert("Something Went Wrong")
+       toast.error("Something Went Wrong")
    }
     }
 

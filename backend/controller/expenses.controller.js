@@ -1,3 +1,4 @@
+const mongoose=require('mongoose')
 const Expense=require('../model/expensModel')
 
 
@@ -7,9 +8,9 @@ const addExpense = async (req, res) => {
   try {
     const userExp = new Expense({
       title,
-      amount,
+      amount ,
       category,
-      date,
+      date:new Date(date),
       note,
       userId,  
     });
@@ -92,6 +93,11 @@ const getExpense = async (req, res) => {
   }
 };
 
+// find sum of all expenses by month, only sum
+
+
+ 
+
 
 
  module.exports={
@@ -99,5 +105,6 @@ const getExpense = async (req, res) => {
     getExpense,
     getExpByID,
     updateExpense,
-    deleteExpense
+    deleteExpense,
+  
  }

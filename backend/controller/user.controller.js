@@ -7,9 +7,18 @@ const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
+     const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
+
+    if(!passwordRegex.test(password))
+    {
+      return res.status(400).json({message:" Password must be 8+ chars, include uppercase, lowercase, number & special char"})
+    }
+
 
     const userExists = await User.findOne({ email });
     if (userExists) {

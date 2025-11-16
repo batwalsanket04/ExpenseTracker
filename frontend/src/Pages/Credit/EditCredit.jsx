@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import {toast} from 'react-toastify'
 
 const EditCredit = ({ isOpen, onClose, credit, onUpdate }) => {
   const [form, setForm] = useState({
@@ -42,11 +43,11 @@ const EditCredit = ({ isOpen, onClose, credit, onUpdate }) => {
       );
 
       onUpdate(res.data.credit); // parent update
-      alert("Credit Updated Successfully");
+      toast.success("Credit Updated Successfully");
       onClose();
     } catch (error) {
       console.log("Error:", error);
-      alert("Something went wrong while updating credit.");
+      toast.error("Something went wrong while updating credit.");
     }
   };
 

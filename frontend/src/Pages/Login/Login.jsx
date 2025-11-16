@@ -2,6 +2,8 @@ import React, { useState, useContext } from "react";
 import axios from "axios";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Context } from "../../../Context/storeContext";
+import {toast} from 'react-toastify'
+ 
 
 const Login = () => {
   const { setToken } = useContext(Context);
@@ -29,14 +31,14 @@ const Login = () => {
 
       localStorage.setItem("userName", res.data.user.name);
 
-      alert("Login Successfully");
+      toast.success("Login Successfully");
       navigate("/dashboard");
     } else {
-      alert(res.data.message || "Invalid Credentials");
+      toast.warning(res.data.message || "Invalid Credentials");
     }
   } catch (error) {
     console.log("Error:", error.response?.data || error.message);
-    alert(error.response?.data?.message || "Error connecting to server");
+    toast.error(error.response?.data?.message || "Error connecting to server");
   }
 };
 

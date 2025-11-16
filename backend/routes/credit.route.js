@@ -1,5 +1,5 @@
 const express=require('express');
-const { AddCredit, ShowCredit, showCreditById, deleteCredit, updateCredit } = require('../controller/credit.controller');
+const { AddCredit, ShowCredit, showCreditById, deleteCredit, updateCredit, getMonthlyCreditFlexible } = require('../controller/credit.controller');
 
 const Router=express.Router();
 
@@ -9,6 +9,7 @@ Router.get("/user/:userId",ShowCredit)
 Router.get("/:id",showCreditById)
 Router.delete("/:id",deleteCredit)
 Router.put("/:id",updateCredit)
+ 
  
 
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import {toast} from 'react-toastify'
 
 const EditExpense = ({ isOpen, onClose, expense, onUpdate }) => {
   const [form, setForm] = useState({
@@ -36,11 +37,11 @@ const EditExpense = ({ isOpen, onClose, expense, onUpdate }) => {
       );
 
       onUpdate(res.data.updated);
-      alert("Expense Updated Successfully!");
+      toast.success("Expense Updated Successfully!");
       onClose();
     } catch (error) {
       console.log("Update Error:", error);
-      alert("Something went wrong!");
+      toast.error("Something went wrong!");
     }
   };
 

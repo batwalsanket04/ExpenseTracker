@@ -14,13 +14,24 @@ import {
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(true);
 
+
+  const handleLogout = () => {
+  localStorage.removeItem("userId");
+  localStorage.removeItem("userName");
+ 
+  localStorage.removeItem("token");
+
+  window.location.href = "/login";
+  localStorage.clear();
+
+};
+
   const menuItems = [
     { icon: <Home size={18} />, label: "Dashboard", path: "/dashboard/overview" },
     { icon: <PlusCircle size={18} />, label: "Add Transaction", path: "/dashboard/add-expense" },
     { icon: <List size={18} />, label: "Show Expenses", path: "/dashboard/show-expense" },
     { icon: <List size={18} />, label: "Show Credits", path: "/dashboard/show-credits" },
-    { icon: <BarChart2 size={18} />, label: "Reports", path: "/dashboard/reports" },
-    { icon: <Settings size={18} />, label: "Settings", path: "/dashboard/settings" },
+    { icon: <Settings size={18} />, label: "Setting", path: "/dashboard/setting" },
   ];
 
   return (
@@ -73,7 +84,8 @@ const Sidebar = () => {
 
       {/* Bottom Section */}
       <div className="p-4 border-t border-indigo-500 relative group">
-        <button
+        <button     
+         onClick={handleLogout}
           className="flex items-center gap-3 w-full px-4 py-2 rounded-lg hover:bg-indigo-600 transition"
         >
           <LogOut size={18} />

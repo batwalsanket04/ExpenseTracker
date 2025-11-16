@@ -2,6 +2,7 @@ import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import EditExpense from "./EditExpenses";
+import {toast} from 'react-toastify'
 
 const ShowExpense = () => {
   const [data, setData] = useState([]);
@@ -35,7 +36,7 @@ const ShowExpense = () => {
 
       setData((prev) => prev.filter((item) => item._id !== id));
 
-      alert(res.data.message || "Expense Deleted Successfully...");
+      toast.success(res.data.message || "Expense Deleted Successfully...");
     } catch (error) {
       console.log("Error", error);
       alert("Error connecting to server");  

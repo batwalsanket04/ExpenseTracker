@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useEffect } from "react";
 import axios from "axios";
 import EditCredit from "./EditCredit";
+import {toast} from 'react-toastify'
 
 const showCredits = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,7 +24,8 @@ const showCredits = () => {
    setData(res.data.data)
     } catch (error) {
       console.log("Error:",error)
-      alert
+      toast.error("Error to cennecting server")
+      
     }
   }
 
@@ -33,11 +35,11 @@ const showCredits = () => {
       const res=await axios.delete(`http://localhost:3000/api/credit/${id}`)
      setData((prev) => prev.filter((val) => val._id !== id));
 
-     alert(res.data.message || "Credit Deleted SuccessFully..")
+     toast.success(res.data.message || "Credit Deleted SuccessFully..")
       
     } catch (error) {
        console.log("Error:",error)
-      alert("Error to connecting Server")
+      toast.error("Error to connecting Server")
     }
 
    };

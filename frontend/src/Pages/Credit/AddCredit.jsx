@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import {toast} from 'react-toastify'
 
 const AddCredit = () => {
   const [data, setData] = useState({
@@ -28,7 +29,7 @@ const AddCredit = () => {
       console.log("User ID:", userId);
 
       if (!userId) {
-        alert("User not found. Please login again!");
+        toast.error("User not found. Please login again!");
         return;
       }
 
@@ -38,7 +39,7 @@ const AddCredit = () => {
       );
 
       if (res.status === 200 || res.status === 201) {
-        alert(res.data.message || "Credit Added Successfully!");
+         toast.success(res.data.message || "Credit Added Successfully!");
       }
 
       setData({
@@ -51,7 +52,7 @@ const AddCredit = () => {
 
     } catch (error) {
       console.log("Error:", error);
-      alert("Error connecting to server");
+      toast.error("Error connecting to server");
     }
   };
 

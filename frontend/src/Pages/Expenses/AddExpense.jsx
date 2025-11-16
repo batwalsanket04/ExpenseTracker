@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import {toast} from 'react-toastify'
 
 const AddExpense = () => {
   const [data, setData] = useState({
@@ -28,16 +29,16 @@ const AddExpense = () => {
 
     setData({
       title: "",
-      amount: "",
+      amount:"",
       category: "",
-      date: "",
+      date:"",
       note: "",
     });
 
-    alert(res.data.message || "Expense Added Successfully!");
+    toast.success(res.data.message || "Expense Added Successfully!");
   } catch (error) {
     console.log("Error", error);
-    alert("Error connecting to server");
+    toast.error("Error connecting to server");
   }
 };
 
