@@ -32,7 +32,7 @@ const EditExpense = ({ isOpen, onClose, expense, onUpdate }) => {
   const handleSubmit = async () => {
     try {
       const res = await axios.put(
-        `http://localhost:3000/api/expense/${form._id}`,
+        `https://expense-tracker-h9ng.onrender.com/api/expense/${form._id}`,
         form
       );
 
