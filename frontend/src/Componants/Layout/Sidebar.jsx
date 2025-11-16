@@ -1,5 +1,10 @@
 import React, { useState } from "react";
+<<<<<<< HEAD
 import { NavLink, useNavigate } from "react-router-dom";
+=======
+import { NavLink } from "react-router-dom";
+
+>>>>>>> 00da3740dc015f27d986b52a5a9fc0361af163d7
 import {
   Home,
   PlusCircle,
@@ -12,6 +17,8 @@ import {
 } from "lucide-react";
 
 const Sidebar = () => {
+  const navigate=useNavigate();
+  
   const [isOpen, setIsOpen] = useState(true);
   const navigate=useNavigate()
 
@@ -21,12 +28,18 @@ const Sidebar = () => {
   localStorage.removeItem("userName");
  
   localStorage.removeItem("token");
+<<<<<<< HEAD
 
   
   localStorage.clear();
   navigate("/login")
   window.confirm("Are You sure You Went To Logout..?")
 
+=======
+  
+  localStorage.clear();
+    navigate("/login")
+>>>>>>> 00da3740dc015f27d986b52a5a9fc0361af163d7
 
 };
 
