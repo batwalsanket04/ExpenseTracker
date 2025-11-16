@@ -45,7 +45,7 @@ const App = () => {
           </Route>
 
           {/* //fallback Routing */}
-          <Route path="*" element={<FallBack />} />
+          <Route path="*" element={<FallBack/>} />
         </Routes>
       </Router>
     </>

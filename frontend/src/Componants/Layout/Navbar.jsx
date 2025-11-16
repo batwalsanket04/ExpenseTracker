@@ -13,11 +13,8 @@ const Navbar = () => {
  const handleLogout = () => {
   localStorage.removeItem("userId");
   localStorage.removeItem("userName");
- 
   localStorage.removeItem("token");
-
   window.confirm("Are You sure you went to Logout..?")
-  window.location.href = "/login";
   localStorage.clear();
   navigate("/login",{replace:true})
 
