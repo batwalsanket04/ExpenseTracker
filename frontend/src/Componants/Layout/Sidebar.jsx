@@ -28,18 +28,15 @@ const Sidebar = () => {
   localStorage.removeItem("userName");
  
   localStorage.removeItem("token");
-<<<<<<< HEAD
 
   
   localStorage.clear();
-  navigate("/login")
   window.confirm("Are You sure You Went To Logout..?")
+  navigate("/login")
 
-=======
   
   localStorage.clear();
     navigate("/login")
->>>>>>> 00da3740dc015f27d986b52a5a9fc0361af163d7
 
 };
 
