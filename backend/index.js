@@ -22,9 +22,9 @@ const creditRoute=require('./routes/credit.route')
  const cors=require('cors')
  app.use(
   cors({
-    origin:[ "http://localhost:5173",//frontend
-           "http://localhost:3000", //backend
-           ],
+    origin: "http://localhost:5173",//frontend
+          
+          
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
