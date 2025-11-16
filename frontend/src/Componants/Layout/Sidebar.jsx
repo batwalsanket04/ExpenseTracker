@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { NavLink } from "react-router-dom";
+
 import {
   Home,
   PlusCircle,
@@ -12,6 +13,8 @@ import {
 } from "lucide-react";
 
 const Sidebar = () => {
+  const navigate=useNavigate();
+  
   const [isOpen, setIsOpen] = useState(true);
 
 
@@ -20,9 +23,9 @@ const Sidebar = () => {
   localStorage.removeItem("userName");
  
   localStorage.removeItem("token");
-
-  window.location.href = "/login";
+  
   localStorage.clear();
+    navigate("/login")
 
 };
 
