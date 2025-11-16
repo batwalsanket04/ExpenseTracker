@@ -38,7 +38,7 @@ const EditCredit = ({ isOpen, onClose, credit, onUpdate }) => {
 
     try {
       const res = await axios.put(
-        `http://localhost:3000/api/credit/${form._id}`,
+        `https://expense-tracker-h9ng.onrender.com/api/credit/${form._id}`,
         form
       );
 
