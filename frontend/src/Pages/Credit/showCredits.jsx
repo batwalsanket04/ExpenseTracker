@@ -20,7 +20,7 @@ const showCredits = () => {
     console.log("Not useID found  in localStorage");
     return;
    }
-   const res=await axios.get(`http://localhost:3000/api/credit/user/${userId}`)
+   const res=await axios.get(`https://expense-tracker-h9ng.onrender.com/api/credit/user/${userId}`)
    setData(res.data.data)
     } catch (error) {
       console.log("Error:",error)
@@ -32,7 +32,7 @@ const showCredits = () => {
    const deleteCredit=async(id)=>{
       
     try {
-      const res=await axios.delete(`http://localhost:3000/api/credit/${id}`)
+      const res=await axios.delete(`https://expense-tracker-h9ng.onrender.com/api/credit/${id}`)
      setData((prev) => prev.filter((val) => val._id !== id));
 
      toast.success(res.data.message || "Credit Deleted SuccessFully..")
