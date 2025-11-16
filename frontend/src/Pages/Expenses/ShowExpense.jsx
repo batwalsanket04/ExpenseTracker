@@ -20,7 +20,7 @@ const ShowExpense = () => {
     }
 
     const res = await axios.get(
-      `http://localhost:3000/api/expense/user/${userId}`
+      `https://expense-tracker-h9ng.onrender.com/api/expense/user/${userId}`
     );
 
     setData(res.data);    
@@ -32,7 +32,7 @@ const ShowExpense = () => {
   // Delete expense
   const deleteExp = async (id) => {
     try {
-      const res = await axios.delete(`http://localhost:3000/api/expense/${id}`);
+      const res = await axios.delete(`https://expense-tracker-h9ng.onrender.com/api/expense/${id}`);
 
       setData((prev) => prev.filter((item) => item._id !== id));
 
