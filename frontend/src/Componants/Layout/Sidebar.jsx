@@ -25,6 +25,7 @@ const Sidebar = () => {
   
   localStorage.clear();
   navigate("/login")
+  window.confirm("Are You sure You Went To Logout..?")
 
 
 };
