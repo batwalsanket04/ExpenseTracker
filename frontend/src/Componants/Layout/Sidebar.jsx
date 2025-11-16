@@ -1,44 +1,25 @@
 import React, { useState } from "react";
-<<<<<<< HEAD
-import { NavLink, useNavigate } from "react-router-dom";
-=======
-import { NavLink } from "react-router-dom";
-
->>>>>>> 00da3740dc015f27d986b52a5a9fc0361af163d7
+import { NavLink, useNavigate } from "react-router-dom"; 
 import {
   Home,
   PlusCircle,
   List,
-  BarChart2,
   Settings,
   LogOut,
   Menu,
-  CreditCard,
 } from "lucide-react";
 
 const Sidebar = () => {
-  const navigate=useNavigate();
-  
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(true);
-  const navigate=useNavigate()
-
 
   const handleLogout = () => {
-  localStorage.removeItem("userId");
-  localStorage.removeItem("userName");
- 
-  localStorage.removeItem("token");
+    const confirmLogout = window.confirm("Are you sure you want to logout?");
+    if (!confirmLogout) return;
 
-  
-  localStorage.clear();
-  window.confirm("Are You sure You Went To Logout..?")
-  navigate("/login")
-
-  
-  localStorage.clear();
-    navigate("/login")
-
-};
+    localStorage.clear();
+    navigate("/login");
+  };
 
   const menuItems = [
     { icon: <Home size={18} />, label: "Dashboard", path: "/dashboard/overview" },
@@ -50,17 +31,13 @@ const Sidebar = () => {
 
   return (
     <div
-      className={`min-h-full max-h-full  bg-indigo-700 text-white flex flex-col  justify-between shadow-lg transition-all duration-300 ${
+      className={`min-h-full max-h-full bg-indigo-700 text-white flex flex-col justify-between shadow-lg transition-all duration-300 ${
         isOpen ? "w-64" : "w-20"
       } rounded-2xl`}
     >
-      {/* Top Section */}
       <div>
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-5 border-b border-indigo-500">
-          {isOpen && (
-            <h1 className="text-xl font-bold tracking-wide">💰 ExpenseApp</h1>
-          )}
+          {isOpen && <h1 className="text-xl font-bold tracking-wide">💰 ExpenseApp</h1>}
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="p-2 rounded-md hover:bg-indigo-600"
@@ -69,14 +46,13 @@ const Sidebar = () => {
           </button>
         </div>
 
-        {/* Navigation */}
         <nav className="mt-6 space-y-2 px-2">
           {menuItems.map((item, index) => (
             <div key={index} className="relative group">
               <NavLink
                 to={item.path}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 w-full h-full px-4 py-2 rounded-lg transition ${
+                  `flex items-center gap-3 px-4 py-2 rounded-lg transition ${
                     isActive ? "bg-indigo-600" : "hover:bg-indigo-600"
                   }`
                 }
@@ -85,7 +61,6 @@ const Sidebar = () => {
                 {isOpen && <span>{item.label}</span>}
               </NavLink>
 
-              {/* Tooltip on hover when collapsed */}
               {!isOpen && (
                 <span className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1 text-sm bg-indigo-600 text-white rounded-md opacity-0 group-hover:opacity-100 whitespace-nowrap transition">
                   {item.label}
@@ -96,10 +71,9 @@ const Sidebar = () => {
         </nav>
       </div>
 
-      {/* Bottom Section */}
       <div className="p-4 border-t border-indigo-500 relative group">
-        <button     
-         onClick={handleLogout}
+        <button
+          onClick={handleLogout}
           className="flex items-center gap-3 w-full px-4 py-2 rounded-lg hover:bg-indigo-600 transition"
         >
           <LogOut size={18} />
