@@ -1,17 +1,19 @@
-const express=require('express');
-const { AddCredit, ShowCredit, showCreditById, deleteCredit, updateCredit, getMonthlyCreditFlexible } = require('../controller/credit.controller');
+const express = require("express");
+const {
+  AddCredit,
+  ShowCredit,
+  showCreditById,
+  deleteCredit,
+  updateCredit,
+} = require("../controllers/credit.controller");
+const { protect } = require("../middleware/authMiddleware");
 
-const Router=express.Router();
+const router = express.Router();
 
+router.post("/add", protect, AddCredit);
+router.get("/user", protect, ShowCredit);        // query: ?userId= (admin only for others)
+router.get("/:id", protect, showCreditById);
+router.put("/:id", protect, updateCredit);
+router.delete("/:id", protect, deleteCredit);
 
-Router.post("/add",AddCredit)
-Router.get("/user/:userId",ShowCredit)
-Router.get("/:id",showCreditById)
-Router.delete("/:id",deleteCredit)
-Router.put("/:id",updateCredit)
- 
- 
-
-
-
-module.exports=Router;
+module.exports = router;

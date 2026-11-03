@@ -1,13 +1,10 @@
-import React, { useState, createContext, useEffect } from "react";
+/* eslint-disable react-refresh/only-export-components */
+import React, { useState, createContext } from "react";
 
 export const Context = createContext(null);
 
 const StoreContext = ({ children }) => {
   const [token, setToken] = useState(() => localStorage.getItem("token") || "");
-
-  const ToggleMode = () => {
-    setIsDark(!isDark);
-  };
 
   
   return (

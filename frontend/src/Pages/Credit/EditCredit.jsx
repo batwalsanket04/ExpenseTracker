@@ -1,140 +1,200 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import {toast} from 'react-toastify'
+import React, { useEffect, useState } from "react";
+import {
+  CalendarDays,
+  CreditCard,
+  FileText,
+  IndianRupee,
+  Pencil,
+  Wallet,
+} from "lucide-react";
+import { toast } from "react-toastify";
+import api from "../../utils/api";
+import { Modal, Spinner } from "../../components/ui";
+import { PAYMENT_METHODS } from "../../utils/categoryMeta";
 
 const EditCredit = ({ isOpen, onClose, credit, onUpdate }) => {
   const [form, setForm] = useState({
-    _id: "",
+    id: "",
     source: "",
     amount: "",
     date: "",
     method: "",
-    note: ""
+    note: "",
   });
+  const [loading, setLoading] = useState(false);
 
-  // Load selected credit data into form
   useEffect(() => {
     if (credit) {
       setForm({
-        _id: credit._id,
-        source: credit.source,
-        amount: credit.amount,
-        date: credit.date?.slice(0, 10),
+        id: credit.id,
+        source: credit.source || "",
+        amount: credit.amount || "",
+        date: credit.date?.slice(0, 10) || "",
         method: credit.method || "",
-        note: credit.note || ""
+        note: credit.note || "",
       });
     }
   }, [credit]);
 
-  // Input handler
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+  const handleChange = (event) => {
+    setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   };
 
-  // Submit handler
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
 
     try {
-      const res = await axios.put(
-        `https://expense-tracker-h9ng.onrender.com/api/credit/${form._id}`,
-        form
-      );
-
-      onUpdate(res.data.credit); // parent update
-      toast.success("Credit Updated Successfully");
+      const response = await api.put(`/credit/${form.id}`, form);
+      onUpdate(response.data.credit);
+      toast.success("Income entry updated successfully");
       onClose();
     } catch (error) {
-      console.log("Error:", error);
-      toast.error("Something went wrong while updating credit.");
+      console.log("Update credit error:", error);
+      toast.error(error.response?.data?.message || "Could not update the income entry");
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-
-      <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg">
-        
-        <h2 className="text-2xl font-semibold mb-5 text-center">
-          Edit Credit
-        </h2>
-
-        <form className="space-y-4" onSubmit={handleSubmit}>
-
-          <input
-            type="text"
-            name="source"
-            value={form.source}
-            onChange={handleChange}
-            placeholder="Credit Source"
-            className="w-full border border-gray-300 p-3 rounded-lg"
-          />
-
-          <input
-            type="number"
-            name="amount"
-            value={form.amount}
-            onChange={handleChange}
-            placeholder="Amount (₹)"
-            className="w-full border border-gray-300 p-3 rounded-lg"
-          />
-
-          <input
-            type="date"
-            name="date"
-            value={form.date}
-            onChange={handleChange}
-            className="w-full border border-gray-300 p-3 rounded-lg"
-          />
-
-          <select
-            name="method"
-            value={form.method}
-            onChange={handleChange}
-            className="w-full border border-gray-300 p-3 rounded-lg"
-          >
-            <option value="">Payment Method</option>
-            <option>Cash</option>
-            <option>Bank Transfer</option>
-            <option>UPI</option>
-            <option>Card</option>
-            <option>Other</option>
-          </select>
-
-          <textarea
-            name="note"
-            rows={3}
-            value={form.note}
-            onChange={handleChange}
-            placeholder="Note (optional)"
-            className="w-full border border-gray-300 p-3 rounded-lg resize-none"
-          ></textarea>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            >
-              Update
-            </button>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      size="lg"
+      title="Edit income"
+      subtitle="Update the details and save your changes."
+      icon={<Pencil size={18} />}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="edit-credit-source" className="label-field">
+              Income source
+            </label>
+            <div className="relative">
+              <Wallet
+                size={16}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                id="edit-credit-source"
+                type="text"
+                name="source"
+                value={form.source}
+                onChange={handleChange}
+                required
+                className="field field-icon h-[44px] py-0"
+              />
+            </div>
           </div>
 
-        </form>
+          <div>
+            <label htmlFor="edit-credit-amount" className="label-field">
+              Amount
+            </label>
+            <div className="relative">
+              <IndianRupee
+                size={16}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                id="edit-credit-amount"
+                type="number"
+                name="amount"
+                value={form.amount}
+                onChange={handleChange}
+                min="0.01"
+                step="0.01"
+                required
+                className="field field-icon h-[44px] py-0"
+              />
+            </div>
+          </div>
+        </div>
 
-      </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="edit-credit-date" className="label-field">
+              Date received
+            </label>
+            <div className="relative">
+              <CalendarDays
+                size={16}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                id="edit-credit-date"
+                type="date"
+                name="date"
+                value={form.date}
+                onChange={handleChange}
+                required
+                className="field field-icon h-[44px] py-0"
+              />
+            </div>
+          </div>
 
-    </div>
+          <div>
+            <label htmlFor="edit-credit-method" className="label-field">
+              Payment method
+            </label>
+            <div className="relative">
+              <CreditCard
+                size={16}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <select
+                id="edit-credit-method"
+                name="method"
+                value={form.method}
+                onChange={handleChange}
+                required
+                className="field field-icon h-[44px] py-0"
+              >
+                <option value="">Select a method</option>
+                {PAYMENT_METHODS.map((method) => (
+                  <option key={method} value={method}>
+                    {method}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="edit-credit-note" className="label-field">
+            Note <span className="font-normal text-slate-400">(optional)</span>
+          </label>
+          <div className="relative">
+            <FileText
+              size={16}
+              className="pointer-events-none absolute left-3.5 top-3.5 text-slate-400"
+            />
+            <textarea
+              id="edit-credit-note"
+              name="note"
+              value={form.note}
+              onChange={handleChange}
+              rows={3}
+              className="field field-icon resize-none"
+              placeholder="Add a note…"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2.5 border-t border-slate-100 pt-4">
+          <button type="button" onClick={onClose} className="btn btn-secondary">
+            Cancel
+          </button>
+          <button type="submit" disabled={loading} className="btn btn-primary">
+            {loading && <Spinner size={15} />}
+            {loading ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

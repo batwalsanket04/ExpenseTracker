@@ -1,11 +1,15 @@
 {
   "name": "backend",
-  "version": "1.0.0",
-  "description": "",
+  "version": "2.0.0",
+  "description": "Expense Tracker backend with PostgreSQL (Sequelize), Redis, JWT access/refresh tokens & role-based access",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev":"nodemon index.js",
+    "dev": "nodemon index.js",
+    "migrate": "npx sequelize-cli db:migrate",
+    "migrate:undo": "npx sequelize-cli db:migrate:undo",
+    "migrate:status": "npx sequelize-cli db:migrate:status",
+    "migrate:create": "npx sequelize-cli migration:generate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -17,7 +21,14 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "ioredis": "^5.5.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.19.3"
+    "pg": "^8.15.0",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.0",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "sequelize-cli": "^6.6.5"
   }
 }

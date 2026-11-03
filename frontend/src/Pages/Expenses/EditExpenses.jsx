@@ -1,144 +1,181 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import {toast} from 'react-toastify'
+import React, { useEffect, useState } from "react";
+import { CalendarDays, FileText, IndianRupee, Pencil, Tag } from "lucide-react";
+import { toast } from "react-toastify";
+import api from "../../utils/api";
+import { Modal, Spinner } from "../../components/ui";
+import { CATEGORY_OPTIONS } from "../../utils/categoryMeta";
 
 const EditExpense = ({ isOpen, onClose, expense, onUpdate }) => {
   const [form, setForm] = useState({
-    _id: "",
+    id: "",
     title: "",
     amount: "",
     category: "",
     date: "",
     note: "",
   });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (expense) {
       setForm({
-        _id: expense._id,
-        title: expense.title,
-        amount: expense.amount,
-        category: expense.category,
-        date: expense.date?.slice(0, 10),
+        id: expense.id,
+        title: expense.title || "",
+        amount: expense.amount || "",
+        category: expense.category || "",
+        date: expense.date?.slice(0, 10) || "",
         note: expense.note || "",
       });
     }
   }, [expense]);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (event) => {
+    setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   };
 
-  const handleSubmit = async () => {
-    try {
-      const res = await axios.put(
-        `https://expense-tracker-h9ng.onrender.com/api/expense/${form._id}`,
-        form
-      );
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
 
-      onUpdate(res.data.updated);
-      toast.success("Expense Updated Successfully!");
+    try {
+      const response = await api.put(`/expense/${form.id}`, form);
+      onUpdate(response.data.updated);
+      toast.success("Expense updated successfully");
       onClose();
     } catch (error) {
-      console.log("Update Error:", error);
-      toast.error("Something went wrong!");
+      console.log("Update expense error:", error);
+      toast.error(error.response?.data?.message || "Could not update the expense");
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-xl w-full max-w-lg shadow-xl">
-
-        <h2 className="text-2xl font-bold text-indigo-600 mb-4 text-center">
-          Edit Expense
-        </h2>
-
-        {/* Form */}
-        <div className="space-y-4">
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <input
-              type="text"
-              name="title"
-              value={form.title}
-              onChange={handleChange}
-              placeholder="Expense Title"
-              className="border border-gray-300 focus:border-indigo-500 
-              focus:ring-2 focus:ring-indigo-100 outline-none p-2.5 rounded-lg w-full"
-            />
-
-            <input
-              type="number"
-              name="amount"
-              value={form.amount}
-              onChange={handleChange}
-              placeholder="Amount (₹)"
-              className="border border-gray-300 focus:border-indigo-500 
-              focus:ring-2 focus:ring-indigo-100 outline-none p-2.5 rounded-lg w-full"
-            />
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      size="lg"
+      title="Edit expense"
+      subtitle="Update the details and save your changes."
+      icon={<Pencil size={18} />}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="edit-expense-title" className="label-field">
+              Expense title
+            </label>
+            <div className="relative">
+              <Tag
+                size={16}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                id="edit-expense-title"
+                type="text"
+                name="title"
+                value={form.title}
+                onChange={handleChange}
+                required
+                className="field field-icon h-[44px] py-0"
+              />
+            </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="edit-expense-amount" className="label-field">
+              Amount
+            </label>
+            <div className="relative">
+              <IndianRupee
+                size={16}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                id="edit-expense-amount"
+                type="number"
+                name="amount"
+                value={form.amount}
+                onChange={handleChange}
+                min="0.01"
+                step="0.01"
+                required
+                className="field field-icon h-[44px] py-0"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="edit-expense-category" className="label-field">
+              Category
+            </label>
             <select
+              id="edit-expense-category"
               name="category"
               value={form.category}
               onChange={handleChange}
-              className="border border-gray-300 focus:border-indigo-500 
-              focus:ring-2 focus:ring-indigo-100 outline-none p-2.5 rounded-lg w-full"
+              required
+              className="field h-[44px] py-0"
             >
-              <option value="">Select Category</option>
-              <option>Food</option>
-              <option>Petrol</option>
-              <option>Bills</option>
-              <option>Shopping</option>
-              <option>Entertainment</option>
-              <option>Other</option>
+              <option value="">Select a category</option>
+              {CATEGORY_OPTIONS.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
             </select>
-
-            <input
-              type="date"
-              name="date"
-              value={form.date}
-              onChange={handleChange}
-              className="border border-gray-300 focus:border-indigo-500 
-              focus:ring-2 focus:ring-indigo-100 outline-none p-2.5 rounded-lg w-full"
-            />
           </div>
 
+          <div>
+            <label htmlFor="edit-expense-date" className="label-field">
+              Date
+            </label>
+            <div className="relative">
+              <CalendarDays
+                size={16}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                id="edit-expense-date"
+                type="date"
+                name="date"
+                value={form.date}
+                onChange={handleChange}
+                required
+                className="field field-icon h-[44px] py-0"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="edit-expense-note" className="label-field">
+            Note <span className="font-normal text-slate-400">(optional)</span>
+          </label>
           <textarea
+            id="edit-expense-note"
             name="note"
             value={form.note}
             onChange={handleChange}
-            placeholder="Add a note (optional)"
             rows={3}
-            className="border border-gray-300 focus:border-indigo-500 
-            focus:ring-2 focus:ring-indigo-100 outline-none p-2.5 rounded-lg w-full resize-none"
+            className="field resize-none"
+            placeholder="Add a note…"
           />
-
         </div>
 
-        {/* Buttons */}
-        <div className="flex justify-end gap-3 mt-5">
-          <button
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-lg bg-gray-300 hover:bg-gray-400 transition"
-          >
+        <div className="flex justify-end gap-2.5 border-t border-slate-100 pt-4">
+          <button type="button" onClick={onClose} className="btn btn-secondary">
             Cancel
           </button>
-
-          <button
-            onClick={handleSubmit}
-            className="px-5 py-2.5 rounded-lg bg-indigo-600 text-white 
-            hover:bg-indigo-700 transition font-medium shadow-sm"
-          >
-            Update Expense
+          <button type="submit" disabled={loading} className="btn btn-primary">
+            {loading && <Spinner size={15} />}
+            {loading ? "Saving…" : "Save changes"}
           </button>
         </div>
-
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 };
 

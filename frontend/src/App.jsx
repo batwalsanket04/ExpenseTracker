@@ -1,54 +1,63 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Signup from "./Pages/Signup/Signup";
+import { AuthProvider } from "./Context/storeContext";
+import Landing from "./Pages/Landing/Landing";
 import Login from "./Pages/Login/Login";
+import Signup from "./Pages/Signup/Signup";
 import Dashboard from "./Componants/Layout/Dashboard";
-import AddExpense from "./Pages/Expenses/AddExpense";
-import Navbar from "./Componants/Layout/Navbar";
-import { Sidebar } from "lucide-react";
-import Overview from "./Pages/Dashboard/Overview";
 import AddTransaction from "./Componants/Layout/AddTransaction/AddTransaction";
 import ShowExpense from "./Pages/Expenses/ShowExpense";
 import ShowCredits from "./Pages/Credit/showCredits";
 import Setting from "./Pages/Setting/Setting";
 import FallBack from "./Pages/FallBack/FallBack";
-
-
+import Overview from "./Pages/Dashboard/Overview";
+import Budgets from "./Pages/Dashboard/Budgets";
+import Reports from "./Pages/Dashboard/Reports";
+import AdminPanel from "./Pages/Dashboard/AdminPanel";
 import ProtectedRoutes from "./ProtectedRoutes/ProtectedRoutes";
 
 const App = () => {
   return (
-    <>
-
+    <AuthProvider>
       <Router>
-        
-        
         <Routes>
-          {/* public Route */}
-          <Route path="/" element={<Signup />} />
+          {/* Public */}
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
 
-          {/* DashBoard Route //protected routes */}
-          <Route path="/dashboard" element={
-            <ProtectedRoutes>
-              <Dashboard/>
-            </ProtectedRoutes>
-          }>
-            {/* Default route inside Dashboard */}
+          {/* Protected workspace */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoutes>
+                <Dashboard />
+              </ProtectedRoutes>
+            }
+          >
             <Route index element={<Overview />} />
-
             <Route path="overview" element={<Overview />} />
             <Route path="add-expense" element={<AddTransaction />} />
             <Route path="show-expense" element={<ShowExpense />} />
             <Route path="show-credits" element={<ShowCredits />} />
             <Route path="setting" element={<Setting />} />
+            <Route path="budgets" element={<Budgets />} />
+            <Route path="reports" element={<Reports />} />
+            <Route
+              path="admin"
+              element={
+                <ProtectedRoutes allowedRoles={["admin"]}>
+                  <AdminPanel />
+                </ProtectedRoutes>
+              }
+            />
           </Route>
 
-          {/* //fallback Routing */}
-          <Route path="*" element={<FallBack/>} />
+          {/* Fallback */}
+          <Route path="*" element={<FallBack />} />
         </Routes>
       </Router>
-    </>
+    </AuthProvider>
   );
 };
 
