@@ -1,13 +1,9 @@
 import axios from "axios";
 
-/* -------------------------------------------------------------------------- */
-/*  API base URL – point this at your backend (local PostgreSQL + Sequelize)  */
-/* -------------------------------------------------------------------------- */
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000/api";
 
 const api = axios.create({ baseURL: API_BASE });
 
-/* Attach Bearer access token on every request */
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("accessToken");
   if (token) {
@@ -16,7 +12,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-/* Auto-refresh on 401 using the refresh token stored in Redis (backend) */
 api.interceptors.response.use(
   (res) => res,
   async (error) => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowDownRight,
@@ -10,6 +10,7 @@ import {
   Plus,
   ReceiptText,
   PiggyBank,
+  RefreshCw,
   Sparkles,
   TrendingDown,
   TrendingUp,
@@ -27,14 +28,84 @@ import {
   StatCard,
 } from "../../components/ui";
 import { getCategoryMeta } from "../../utils/categoryMeta";
-import { formatDate, formatMoney } from "../../utils/format";
+import { formatDate, formatMoney, todayISO } from "../../utils/format";
 import { loadPreferences } from "../../utils/preferences";
 import { toast } from "react-toastify";
+import BudgetAlerts from "../../components/BudgetAlerts";
 
 const toDateKey = (date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
     date.getDate()
   ).padStart(2, "0")}`;
+
+const transactionDateKey = (value) => {
+  if (!value) return "";
+  const raw = String(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw.slice(0, 10)) && !raw.includes("T")) {
+    return raw.slice(0, 10);
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : toDateKey(date);
+};
+
+const fetchAllExpenses = async () => {
+  const limit = 100;
+  let page = 1;
+  let rows = [];
+
+  while (true) {
+    const response = await api.get("/expense/user", { params: { page, limit } });
+    const data = response.data?.data;
+    if (!Array.isArray(data)) break;
+
+    rows = rows.concat(data);
+    const totalPages = Number(response.data?.pagination?.totalPages || 1);
+    if (page >= totalPages || data.length === 0) break;
+    page += 1;
+  }
+
+  return rows;
+};
+
+const PERIOD_OPTIONS = [
+  { key: "today", label: "Today" },
+  { key: "week", label: "This week" },
+  { key: "month", label: "This month" },
+  { key: "year", label: "This year" },
+  { key: "all", label: "All time" },
+];
+
+/**
+ * Check whether a transaction date falls inside the selected period.
+ */
+const withinPeriod = (dateValue, period) => {
+  if (!dateValue) return false;
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return false;
+  const now = new Date();
+
+  switch (period) {
+    case "today":
+      return toDateKey(date) === toDateKey(now);
+    case "week": {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - 6);
+      weekStart.setHours(0, 0, 0, 0);
+      return date >= weekStart && date <= now;
+    }
+    case "month": {
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      return date >= monthStart && date <= now;
+    }
+    case "year": {
+      const yearStart = new Date(now.getFullYear(), 0, 1);
+      return date >= yearStart && date <= now;
+    }
+    case "all":
+    default:
+      return true;
+  }
+};
 
 const UserOverview = () => {
   const { user } = useAuth();
@@ -43,60 +114,101 @@ const UserOverview = () => {
   const [expenses, setExpenses] = useState([]);
   const [credits, setCredits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [period, setPeriod] = useState("month");
   const [preferences] = useState(loadPreferences);
 
+  const fetchData = async (isRefresh = false) => {
+    try {
+      if (!isRefresh) setLoading(true);
+      else setRefreshing(true);
+
+      const [expRes, creditRes] = await Promise.all([
+        fetchAllExpenses(),
+        api.get("/credit/user"),
+      ]);
+
+      setExpenses(Array.isArray(expRes) ? expRes : []);
+      setCredits(
+        creditRes.data && Array.isArray(creditRes.data.data)
+          ? creditRes.data.data
+          : []
+      );
+    } catch (error) {
+      console.log("Dashboard error:", error);
+      if (!isRefresh) toast.error("Could not load your dashboard data");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const refresh = () => fetchData(true);
+
+  // Auto-refresh when the tab/window regains focus so newly added
+  // transactions show up without a hard reload.
   useEffect(() => {
-    let active = true;
-
-    const fetchData = async () => {
-      try {
-        const [expRes, creditRes] = await Promise.all([
-          api.get("/expense/user"),
-          api.get("/credit/user"),
-        ]);
-
-        if (!active) return;
-
-        setExpenses(Array.isArray(expRes.data) ? expRes.data : []);
-        setCredits(
-          creditRes.data && Array.isArray(creditRes.data.data)
-            ? creditRes.data.data
-            : []
-        );
-      } catch (error) {
-        console.log("Dashboard error:", error);
-        toast.error("Could not load your dashboard data");
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
     fetchData();
+
+    const handleFocus = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const handleChange = () => refresh();
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+    window.addEventListener("transactions:changed", handleChange);
+
     return () => {
-      active = false;
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+      window.removeEventListener("transactions:changed", handleChange);
     };
   }, []);
 
-  if (loading) return <PageLoader label="Preparing your financial snapshot…" />;
-
   const now = new Date();
   const todayKey = toDateKey(now);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const inCurrentMonth = (value) => {
-    const date = new Date(value);
-    return !Number.isNaN(date.getTime()) && date >= monthStart && date <= now;
-  };
 
-  const totalExpense = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const totalCredit = credits.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  // Dynamically filter data by the selected period.
+  const filteredExpenses = useMemo(
+    () => expenses.filter((item) => withinPeriod(item.date, period)),
+    [expenses, period]
+  );
+  const filteredCredits = useMemo(
+    () => credits.filter((item) => withinPeriod(item.date, period)),
+    [credits, period]
+  );
+
+  const totalExpense = filteredExpenses.reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  );
+  const totalCredit = filteredCredits.reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  );
   const netBalance = totalCredit - totalExpense;
 
   const todayExpense = expenses
-    .filter((item) => String(item.date || "").slice(0, 10) === todayKey)
+    .filter((item) => transactionDateKey(item.date) === todayKey)
     .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-  const monthExpenses = expenses.filter((item) => inCurrentMonth(item.date));
-  const monthCredits = credits.filter((item) => inCurrentMonth(item.date));
+  const monthExpenses = expenses.filter((item) => {
+    const date = new Date(item.date);
+    return (
+      !Number.isNaN(date.getTime()) &&
+      date >= new Date(now.getFullYear(), now.getMonth(), 1) &&
+      date <= now
+    );
+  });
+  const monthCredits = credits.filter((item) => {
+    const date = new Date(item.date);
+    return (
+      !Number.isNaN(date.getTime()) &&
+      date >= new Date(now.getFullYear(), now.getMonth(), 1) &&
+      date <= now
+    );
+  });
   const monthExpense = monthExpenses.reduce(
     (sum, item) => sum + Number(item.amount || 0),
     0
@@ -107,13 +219,13 @@ const UserOverview = () => {
   );
 
   const recentTransactions = [
-    ...expenses.map((item) => ({ ...item, type: "Expense" })),
-    ...credits.map((item) => ({ ...item, type: "Income" })),
+    ...filteredExpenses.map((item) => ({ ...item, type: "Expense" })),
+    ...filteredCredits.map((item) => ({ ...item, type: "Income" })),
   ]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 6);
 
-  const weekly = Array.from({ length: 7 }, (_, index) => {
+  const weeklyDays = Array.from({ length: 7 }, (_, index) => {
     const date = new Date();
     date.setDate(date.getDate() - (6 - index));
     return {
@@ -123,16 +235,26 @@ const UserOverview = () => {
     };
   });
 
-  expenses.forEach((item) => {
-    const key = String(item.date || "").slice(0, 10);
-    const day = weekly.find((entry) => entry.key === key);
+  // The "Last 7 days" chart always shows the trailing 7 days regardless of the
+  // period selector, so it never goes empty just because "This month" is picked.
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - 6);
+  weekStart.setHours(0, 0, 0, 0);
+  const weeklyExpenses = expenses.filter((item) => {
+    const date = new Date(item.date);
+    return !Number.isNaN(date.getTime()) && date >= weekStart && date <= now;
+  });
+
+  weeklyExpenses.forEach((item) => {
+    const key = transactionDateKey(item.date);
+    const day = weeklyDays.find((entry) => entry.key === key);
     if (day) day.amount += Number(item.amount || 0);
   });
 
-  const weeklyMax = Math.max(...weekly.map((day) => day.amount), 1);
-  const weeklyTotal = weekly.reduce((sum, day) => sum + day.amount, 0);
+  const weeklyMax = Math.max(...weeklyDays.map((day) => day.amount), 1);
+  const weeklyTotal = weeklyDays.reduce((sum, day) => sum + day.amount, 0);
 
-  const categoryTotals = monthExpenses.reduce((accumulator, item) => {
+  const categoryTotals = filteredExpenses.reduce((accumulator, item) => {
     const category = item.category || "Other";
     accumulator[category] = (accumulator[category] || 0) + Number(item.amount || 0);
     return accumulator;
@@ -185,18 +307,44 @@ const UserOverview = () => {
         title={`${greeting}, ${firstName}`}
         subtitle="Here's a clear view of your money — balance, recent activity and where your spending is going."
         actions={
-          <>
-            <Link to="/dashboard/reports" className="btn btn-secondary">
-              <BarChart3 size={16} className="text-teal-500" />
-              View reports
+          <div className="flex items-center gap-2">
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="field text-xs border border-slate-200 bg-white px-2 py-1.5 rounded-lg shadow-sm focus:ring-1 focus:ring-teal-500"
+            >
+              {PERIOD_OPTIONS.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={refresh}
+              disabled={refreshing}
+              className="btn btn-secondary btn-sm disabled:opacity-60 disabled:pointer-events-none"
+              title="Refresh"
+            >
+              {refreshing ? (
+                <RefreshCw size={14} className="animate-spin" />
+              ) : (
+                <RefreshCw size={14} />
+              )}
+            </button>
+            <Link to="/dashboard/reports" className="btn btn-secondary btn-sm">
+              <BarChart3 size={14} className="text-teal-500" />
+              Reports
             </Link>
-            <Link to="/dashboard/add-expense" className="btn btn-primary">
-              <Plus size={16} strokeWidth={2.5} />
-              Add transaction
+            <Link to="/dashboard/add-expense" className="btn btn-primary btn-sm">
+              <Plus size={14} strokeWidth={2.5} />
+              Add
             </Link>
-          </>
+          </div>
         }
       />
+
+      <BudgetAlerts autoToast />
 
       {/* Balance hero */}
       <section className="relative overflow-hidden rounded-3xl bg-[#102a25] p-6 text-white shadow-2xl shadow-teal-950/20 sm:p-7">
@@ -264,7 +412,7 @@ const UserOverview = () => {
             </div>
 
             <div className="mt-5 flex h-28 items-end gap-1.5 sm:gap-2.5">
-              {weekly.map((day) => (
+              {weeklyDays.map((day) => (
                 <div key={day.key} className="group flex h-full flex-1 items-end">
                   <div
                     className="w-full rounded-t-md bg-gradient-to-t from-teal-500/60 via-teal-400/80 to-teal-300 transition-all duration-300 group-hover:from-teal-400 group-hover:to-teal-200"
@@ -278,7 +426,7 @@ const UserOverview = () => {
             </div>
 
             <div className="mt-2 flex gap-1.5 sm:gap-2.5">
-              {weekly.map((day) => (
+              {weeklyDays.map((day) => (
                 <span
                   key={day.key}
                   className="flex-1 text-center text-[9px] font-semibold uppercase tracking-wide text-slate-500"

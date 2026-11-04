@@ -18,6 +18,9 @@ const userRoute = require("./routes/user.route");
 const expRoute = require("./routes/expenses.route");
 const creditRoute = require("./routes/credit.route");
 const budgetRoute = require("./routes/budget.route");
+const budgetPreferenceRoute = require("./routes/budgetPreference.route");
+const notificationPreferenceRoute = require("./routes/notificationPreference.route");
+const notificationRoute = require("./routes/notification.route");
 
 // Middleware
 app.use(requestLogger);
@@ -31,7 +34,7 @@ app.use(
       "http://localhost:5173",
       "https://expensetracker-2-58w9.onrender.com",
     ],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   })
 );
@@ -53,6 +56,9 @@ app.use("/api/user", userRoute);
 app.use("/api/expense", expRoute);
 app.use("/api/credit", creditRoute);
 app.use("/api/budget", budgetRoute);
+app.use("/api/budget-preferences", budgetPreferenceRoute);
+app.use("/api/notification-preferences", notificationPreferenceRoute);
+app.use("/api/notifications", notificationRoute);
 
 // 404 + final error boundary
 app.use(notFoundHandler);

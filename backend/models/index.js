@@ -11,6 +11,13 @@ fs.readdirSync(__dirname)
     db[model.name] = model;
   });
 
+// Set up cross-model associations (e.g. NotificationPreference -> User).
+Object.values(db).forEach((model) => {
+  if (model && typeof model.associate === "function") {
+    model.associate(db);
+  }
+});
+
 db.sequelize = sequelize;
 db.Sequelize = require("sequelize");
 

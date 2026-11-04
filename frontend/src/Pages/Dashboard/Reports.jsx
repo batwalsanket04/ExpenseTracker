@@ -22,7 +22,7 @@ import {
   SectionTitle,
   StatCard,
 } from "../../components/ui";
-import { getCategoryMeta } from "../../utils/categoryMeta";
+import { getCategoryMeta, CATEGORY_OPTIONS } from "../../utils/categoryMeta";
 import { downloadCsv } from "../../utils/download";
 import { formatDate, formatMoney, todayISO } from "../../utils/format";
 
@@ -43,7 +43,13 @@ const Reports = () => {
 
         if (!active) return;
 
-        setExpenses(Array.isArray(expenseResponse.data) ? expenseResponse.data : []);
+        // Backend wraps the expense list in { data: rows, pagination }, so read
+        // the nested array (same shape as the credit response) to keep reports dynamic.
+        setExpenses(
+          expenseResponse.data && Array.isArray(expenseResponse.data.data)
+            ? expenseResponse.data.data
+            : []
+        );
         setCredits(
           creditResponse.data && Array.isArray(creditResponse.data.data)
             ? creditResponse.data.data
@@ -69,19 +75,23 @@ const Reports = () => {
   const savingsRate = totalCredit > 0 ? (netBalance / totalCredit) * 100 : 0;
 
   const categoryData = useMemo(() => {
+    const allowed = new Set(CATEGORY_OPTIONS);
     const totals = expenses.reduce((accumulator, item) => {
-      const category = item.category || "Other";
+      // Normalize: only the predefined categories show in reports; everything
+      // else (e.g. legacy seed data like Transport/Utilities/Fuel/Groceries)
+      // is grouped under "Other" so no unnecessary categories appear.
+      const category = allowed.has(item.category) ? item.category : "Other";
       accumulator[category] = (accumulator[category] || 0) + Number(item.amount || 0);
       return accumulator;
     }, {});
 
-    return Object.entries(totals)
-      .map(([category, amount]) => ({
-        category,
-        amount,
-        percentage: totalExpense > 0 ? (amount / totalExpense) * 100 : 0,
-        meta: getCategoryMeta(category),
-      }))
+    return CATEGORY_OPTIONS.map((category) => ({
+      category,
+      amount: totals[category] || 0,
+      percentage: totalExpense > 0 ? ((totals[category] || 0) / totalExpense) * 100 : 0,
+      meta: getCategoryMeta(category),
+    }))
+      .filter((item) => item.amount > 0)
       .sort((a, b) => b.amount - a.amount);
   }, [expenses, totalExpense]);
 

@@ -54,6 +54,8 @@ const AddCredit = () => {
 
       setData({ ...initialData, date: todayISO() });
       toast.success(response.data.message || "Income added successfully");
+      // Signal any open dashboard tab to refresh its data.
+      window.dispatchEvent(new CustomEvent("transactions:changed"));
     } catch (error) {
       console.log("Add credit error:", error);
       toast.error(error.response?.data?.message || "Could not save the income entry");

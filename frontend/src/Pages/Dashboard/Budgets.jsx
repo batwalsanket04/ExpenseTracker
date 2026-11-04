@@ -27,6 +27,7 @@ import {
 import { CATEGORY_OPTIONS, getCategoryMeta } from "../../utils/categoryMeta";
 import { addDaysISO, formatDate, formatMoney, todayISO } from "../../utils/format";
 import { loadPreferences } from "../../utils/preferences";
+import BudgetAlerts from "../../components/BudgetAlerts";
 
 const defaultDates = (period) => {
   const startDate = todayISO();
@@ -191,6 +192,8 @@ const Budgets = () => {
           </button>
         }
       />
+
+      <BudgetAlerts autoToast />
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

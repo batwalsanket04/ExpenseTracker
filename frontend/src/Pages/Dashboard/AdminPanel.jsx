@@ -3,11 +3,14 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   Activity,
   BarChart3,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Clock,
   Database,
   Download,
   FileText,
+  Filter,
   KeyRound,
   Layout,
   LayoutDashboard,
@@ -21,6 +24,8 @@ import {
   TrendingUp,
   Users,
   Wallet,
+  X,
+  Bell,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import api from "../../utils/api";
@@ -37,7 +42,7 @@ import {
   Spinner,
   StatCard,
 } from "../../components/ui";
-import { getCategoryMeta } from "../../utils/categoryMeta";
+import { getCategoryMeta, CATEGORY_OPTIONS } from "../../utils/categoryMeta";
 import { downloadCsv } from "../../utils/download";
 import { formatDate, formatDateTime, formatMoney, todayISO } from "../../utils/format";
 
@@ -88,6 +93,52 @@ const AdminPanel = () => {
   const [userToDelete, setUserToDelete] = useState(null);
   const [deletingUser, setDeletingUser] = useState(false);
 
+  /* --- Notification preferences (admin) --- */
+  const [notificationPrefs, setNotificationPrefs] = useState([]);
+  const [loadingPrefs, setLoadingPrefs] = useState(false);
+  const [savingPrefs, setSavingPrefs] = useState({});
+
+  const fetchNotificationPrefs = async () => {
+    setLoadingPrefs(true);
+    try {
+      const res = await api.get("/notification-preferences/admin/all");
+      const rows = Array.isArray(res.data.data) ? res.data.data : [];
+      setNotificationPrefs(rows);
+    } catch (error) {
+      console.log("Fetch admin notification preferences error:", error);
+      toast.error("Could not load notification preferences");
+    } finally {
+      setLoadingPrefs(false);
+    }
+  };
+
+  const toggleUserNotificationPref = async (userId, key, checked) => {
+    setSavingPrefs((prev) => ({ ...prev, [userId]: true }));
+    try {
+      await api.put(`/notification-preferences/admin/${userId}`, {
+        [key]: checked,
+      });
+      toast.success("Notification preference updated");
+      setNotificationPrefs((rows) =>
+        rows.map((row) =>
+          row.userId === userId
+            ? { ...row, [key]: checked }
+            : row
+        )
+      );
+    } catch (error) {
+      console.log("Update user notification preference error:", error);
+      toast.error("Could not update notification preference");
+      // Revert optimistic UI is handled by re-fetch on next mount; keep simple.
+    } finally {
+      setSavingPrefs((prev) => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+    }
+  };
+
   const fetchDashboardData = async () => {
     try {
       const [userResponse, expenseResponse, creditResponse] = await Promise.all([
@@ -98,7 +149,12 @@ const AdminPanel = () => {
 
       setAllUsers(userResponse.data.users || []);
       setAllAdmins(userResponse.data.admins || []);
-      setAllExpenses(Array.isArray(expenseResponse.data) ? expenseResponse.data : []);
+      // Backend wraps the expense list in { data: rows, pagination }
+      setAllExpenses(
+        expenseResponse.data && Array.isArray(expenseResponse.data.data)
+          ? expenseResponse.data.data
+          : []
+      );
       setAllCredits(
         creditResponse.data && Array.isArray(creditResponse.data.data)
           ? creditResponse.data.data
@@ -114,6 +170,7 @@ const AdminPanel = () => {
 
   useEffect(() => {
     fetchDashboardData();
+    fetchNotificationPrefs();
   }, []);
 
   const userMap = useMemo(() => {
@@ -152,8 +209,12 @@ const AdminPanel = () => {
   }, [allUsers, allAdmins, allExpenses, allCredits]);
 
   const categoryData = useMemo(() => {
+    const allowed = new Set(CATEGORY_OPTIONS);
     const totals = allExpenses.reduce((accumulator, item) => {
-      const category = item.category || "Other";
+      // Normalize: only predefined categories show; legacy/unknown categories
+      // (e.g. Transport, Utilities, Fuel, Groceries from seed data) are grouped
+      // under "Other" so no unnecessary categories appear in reports.
+      const category = allowed.has(item.category) ? item.category : "Other";
       if (!accumulator[category]) {
         accumulator[category] = { amount: 0, count: 0 };
       }
@@ -162,28 +223,20 @@ const AdminPanel = () => {
       return accumulator;
     }, {});
 
-    return Object.entries(totals)
-      .map(([category, value]) => ({
+    return CATEGORY_OPTIONS.map((category) => {
+      const value = totals[category] || { amount: 0, count: 0 };
+      return {
         category,
         amount: value.amount,
         count: value.count,
         percentage:
           stats.totalExpense > 0 ? (value.amount / stats.totalExpense) * 100 : 0,
         meta: getCategoryMeta(category),
-      }))
+      };
+    })
+      .filter((item) => item.amount > 0)
       .sort((a, b) => b.amount - a.amount);
   }, [allExpenses, stats.totalExpense]);
-
-  const auditLogs = useMemo(
-    () =>
-      transactionRows.slice(0, 40).map((item) => ({
-        ...item,
-        action: item.type === "Expense" ? "Expense recorded" : "Income recorded",
-        actor: item.userName,
-        target: item.title,
-      })),
-    [transactionRows]
-  );
 
   const recentActivity = transactionRows.slice(0, 8);
 
@@ -253,24 +306,48 @@ const AdminPanel = () => {
     toast.success("User directory exported");
   };
 
-  const exportAuditLogs = () => {
-    if (auditLogs.length === 0) {
-      toast.info("There are no audit records to export yet.");
-      return;
-    }
+  const exportAuditLogs = async () => {
+    try {
+      const logs = await fetchAllAuditLogs();
+      if (logs.length === 0) {
+        toast.info("There are no audit records to export yet.");
+        return;
+      }
 
-    downloadCsv(`expense-tracker-audit-logs-${todayISO()}.csv`, [
-      ["Time", "Action", "Actor", "Target", "Amount (INR)", "Type"],
-      ...auditLogs.map((log) => [
-        log.date ? new Date(log.date).toISOString() : "",
-        log.action,
-        log.actor,
-        log.target,
-        log.amount,
-        log.type,
-      ]),
-    ]);
-    toast.success("Audit trail exported");
+      downloadCsv(`expense-tracker-audit-logs-${todayISO()}.csv`, [
+        ["Time", "Action", "Actor", "Target", "Amount (INR)", "Type"],
+        ...logs.map((log) => [
+          log.date ? new Date(log.date).toISOString() : "",
+          log.action,
+          log.actor,
+          log.target,
+          log.amount,
+          log.type,
+        ]),
+      ]);
+      toast.success("Audit trail exported");
+    } catch (error) {
+      toast.error("Could not export audit trail");
+    }
+  };
+
+  /**
+   * Fetch every audit log record (all pages) for export.
+   */
+  const fetchAllAuditLogs = async () => {
+    const all = [];
+    let page = 1;
+    const limit = 100;
+    for (;;) {
+      const params = new URLSearchParams({ page, limit });
+      const res = await api.get(`/audit?${params.toString()}`);
+      const body = res.data || {};
+      const pageLogs = Array.isArray(body.data) ? body.data : [];
+      all.push(...pageLogs);
+      if (pageLogs.length < limit || page >= (body.pagination?.totalPages || 1)) break;
+      page += 1;
+    }
+    return all;
   };
 
   if (loading) return <PageLoader label="Loading the admin console…" />;
@@ -354,15 +431,13 @@ const AdminPanel = () => {
       )}
       {activeTab === "users" && (
         <UsersSection
-          users={allUsers}
-          admins={allAdmins}
           currentUserId={user?.id}
           onDelete={setUserToDelete}
           onExport={exportUsers}
         />
       )}
       {activeTab === "transactions" && (
-        <TransactionsSection rows={transactionRows} onExport={exportTransactions} />
+        <TransactionsSection onExport={exportTransactions} />
       )}
       {activeTab === "categories" && (
         <CategoriesSection categoryData={categoryData} totalExpense={stats.totalExpense} />
@@ -371,11 +446,105 @@ const AdminPanel = () => {
         <ReportsSection stats={stats} categoryData={categoryData} rows={transactionRows} />
       )}
       {activeTab === "audit" && (
-        <AuditLogsSection logs={auditLogs} onExport={exportAuditLogs} />
+        <AuditLogsSection onExport={exportAuditLogs} />
       )}
       {activeTab === "security" && (
-        <SecuritySection logs={auditLogs} onExportAudit={exportAuditLogs} />
+        <SecuritySection onExportAudit={exportAuditLogs} />
       )}
+
+      {/* Admin: manage notification preferences for every user */}
+      <div className="surface overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <SectionTitle
+            icon={Bell}
+            title="User notification preferences"
+            subtitle={
+              notificationPrefs.length === 0
+                ? "No preferences yet"
+                : `Manage email, in-app, reminders and summary digests for ${notificationPrefs.length} user${notificationPrefs.length === 1 ? "" : "s"}.`
+            }
+          />
+          <button
+            type="button"
+            onClick={fetchNotificationPrefs}
+            disabled={loadingPrefs}
+            className="btn btn-secondary btn-sm"
+          >
+            {loadingPrefs ? <Spinner size={14} /> : <Download size={14} />}
+            Refresh
+          </button>
+        </div>
+
+        {loadingPrefs ? (
+          <PageLoader label="Loading notification preferences…" className="h-[300px]" />
+        ) : notificationPrefs.length === 0 ? (
+          <EmptyState
+            icon={Bell}
+            title="No notification preferences yet"
+            description="Preferences are created automatically when a user first opens their settings."
+            className="py-10"
+          />
+        ) : (
+          <div className="divide-y divide-slate-100 px-3 pb-2 sm:px-4">
+            {notificationPrefs.map((row) => {
+              const user = row.user || {};
+              return (
+                <div
+                  key={row.userId}
+                  className="flex items-center gap-3 rounded-xl px-2 py-3 transition hover:bg-slate-50/80 sm:px-3"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar name={user.name || "User"} size="sm" className="ring-transparent" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-semibold text-slate-800">
+                        {user.name || "Unknown user"}
+                      </p>
+                      <p className="truncate text-[11px] text-slate-500">
+                        {user.email || "—"} ·{" "}
+                        <span className="capitalize">{user.role || "user"}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 sm:gap-3 ml-auto">
+                    {[
+                      { key: "emailNotifications", label: "Email" },
+                      { key: "inAppNotifications", label: "In-app" },
+                      { key: "expenseReminder", label: "Reminder" },
+                      { key: "weeklySummary", label: "Weekly" },
+                      { key: "monthlySummary", label: "Monthly" },
+                    ].map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        role="switch"
+                        aria-checked={row[item.key]}
+                        aria-label={`${user.name} ${item.label} notifications`}
+                        onClick={() =>
+                          toggleUserNotificationPref(
+                            row.userId,
+                            item.key,
+                            !row[item.key]
+                          )
+                        }
+                        disabled={savingPrefs[row.userId]}
+                        className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors duration-200 ${
+                          row[item.key] ? "bg-teal-600" : "bg-slate-200"
+                        } ${savingPrefs[row.userId] ? "opacity-60 cursor-not-allowed" : ""}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            row[item.key] ? "translate-x-[18px]" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <ConfirmDialog
         open={Boolean(userToDelete)}
@@ -565,27 +734,102 @@ const OverviewSection = ({ stats, recentActivity }) => {
 /* ------------------------------------------------------------------ */
 /*  Users                                                              */
 /* ------------------------------------------------------------------ */
-const UsersSection = ({ users, admins, currentUserId, onDelete, onExport }) => {
+const UsersSection = ({ currentUserId, onDelete, onExport }) => {
+  const [users, setUsers] = useState([]);
+  const [admins, setAdmins] = useState([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+  });
   const [query, setQuery] = useState("");
+  const [role, setRole] = useState("all");
+  const [loading, setLoading] = useState(true);
 
-  const rows = useMemo(
-    () => [
-      ...users.map((item) => ({ ...item, displayRole: "user" })),
-      ...admins.map((item) => ({ ...item, displayRole: "admin" })),
-    ],
-    [users, admins]
-  );
+  const fetchUsers = async (page = pagination.page) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", page);
+      params.set("limit", pagination.limit);
+      if (query.trim()) params.set("search", query.trim());
+      if (role !== "all") params.set("role", role);
 
-  const filtered = useMemo(() => {
-    const value = query.trim().toLowerCase();
-    if (!value) return rows;
-    return rows.filter(
-      (item) =>
-        String(item.name || "").toLowerCase().includes(value) ||
-        String(item.email || "").toLowerCase().includes(value) ||
-        item.displayRole.includes(value)
-    );
-  }, [rows, query]);
+      const res = await api.get(`/user?${params.toString()}`);
+      setUsers(res.data.users || []);
+      setAdmins(res.data.admins || []);
+      setPagination((prev) => ({
+        ...prev,
+        page,
+        total: res.data.pagination?.total ?? 0,
+        totalPages: res.data.pagination?.totalPages ?? 0,
+      }));
+    } catch (error) {
+      console.log("Fetch users error:", error);
+      toast.error("Could not load users");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [query, role, pagination.limit]);
+
+  const handlePageChange = (page) => {
+    if (page < 1 || page > pagination.totalPages) return;
+    setPagination((prev) => ({ ...prev, page }));
+    fetchUsers(page);
+  };
+
+  const fetchAllUsers = async () => {
+    const all = [];
+    let page = 1;
+    const limit = 100;
+    for (;;) {
+      const params = new URLSearchParams({ page, limit });
+      if (query.trim()) params.set("search", query.trim());
+      if (role !== "all") params.set("role", role);
+      const res = await api.get(`/user?${params.toString()}`);
+      const body = res.data || {};
+      const pageUsers = Array.isArray(body.users) ? body.users : [];
+      const pageAdmins = Array.isArray(body.admins) ? body.admins : [];
+      all.push(
+        ...pageUsers.map((item) => ({ ...item, displayRole: "user" })),
+        ...pageAdmins.map((item) => ({ ...item, displayRole: "admin" }))
+      );
+      if (pageUsers.length < limit && pageAdmins.length < limit) break;
+      page += 1;
+      if (page > 20) break;
+    }
+    return all;
+  };
+
+  const handleExport = async () => {
+    try {
+      const all = await fetchAllUsers();
+      if (all.length === 0) {
+        toast.info("There are no users to export yet.");
+        return;
+      }
+      const rows = [
+        ["Name", "Email", "Role", "Joined"],
+        ...all.map((item) => [
+          item.name,
+          item.email,
+          item.displayRole,
+          item.createdAt?.slice(0, 10) || "",
+        ]),
+      ];
+      downloadCsv(`expense-tracker-users-${todayISO()}.csv`, rows);
+      toast.success("User directory exported");
+    } catch (error) {
+      toast.error("Could not export users");
+    }
+  };
+
+  const rows = useMemo(() => [...users, ...admins], [users, admins]);
 
   return (
     <div className="surface overflow-hidden">
@@ -593,24 +837,44 @@ const UsersSection = ({ users, admins, currentUserId, onDelete, onExport }) => {
         <SectionTitle
           icon={Users}
           title="Users & administrators"
-          subtitle={`${users.length} users · ${admins.length} admins`}
+          subtitle={`${users.length + admins.length} total · Page ${pagination.page} of ${Math.max(1, pagination.totalPages)}`}
         />
-        <button type="button" onClick={onExport} className="btn btn-secondary btn-sm">
+        <button type="button" onClick={handleExport} className="btn btn-secondary btn-sm">
           <Download size={14} />
           Export directory
         </button>
       </div>
 
-      <div className="border-b border-slate-100 p-4">
+      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
         <SearchInput
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPagination((prev) => ({ ...prev, page: 1 }));
+          }}
           placeholder="Search by name, email or role…"
-          className="max-w-md"
+          className="flex-1 lg:w-[320px]"
         />
+        <div className="flex gap-2 w-full lg:w-auto">
+          <select
+            value={role}
+            onChange={(event) => {
+              setRole(event.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            className="field h-[42px] py-0 sm:w-[140px]"
+            aria-label="Filter by role"
+          >
+            <option value="all">All roles</option>
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <PageLoader label="Loading users…" className="h-[300px]" />
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={Users}
           title="No matching users"
@@ -631,7 +895,7 @@ const UsersSection = ({ users, admins, currentUserId, onDelete, onExport }) => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((item) => (
+                {rows.map((item) => (
                   <tr key={`${item.displayRole}-${item.id}`}>
                     <td>
                       <div className="flex items-center gap-3">
@@ -691,7 +955,7 @@ const UsersSection = ({ users, admins, currentUserId, onDelete, onExport }) => {
           </div>
 
           <div className="divide-y divide-slate-100 md:hidden">
-            {filtered.map((item) => (
+            {rows.map((item) => (
               <div key={`${item.displayRole}-${item.id}`} className="p-4">
                 <div className="flex items-start gap-3">
                   <Avatar name={item.name} size="md" className="ring-transparent" />
@@ -727,6 +991,59 @@ const UsersSection = ({ users, admins, currentUserId, onDelete, onExport }) => {
               </div>
             ))}
           </div>
+
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 sm:px-6 bg-slate-50/60">
+              <div className="text-[11px] text-slate-500">
+                Page <strong>{pagination.page}</strong> of{" "}
+                <strong>{Math.max(1, pagination.totalPages)}</strong>
+                · {pagination.total} total{" "}
+                {pagination.total === 1 ? "user" : "users"}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                  className="btn btn-secondary btn-sm h-[34px] px-3 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  <ChevronLeft size={12} />
+                  Prev
+                </button>
+                {[...Array(Math.max(1, pagination.totalPages))].map((_, i) => {
+                  const pageNum = i + 1;
+                  const show =
+                    pagination.totalPages <= 5 ||
+                    pageNum === 1 ||
+                    pageNum === pagination.totalPages ||
+                    Math.abs(pageNum - pagination.page) <= 1;
+                  if (!show) return null;
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`btn btn-sm h-[34px] w-[34px] ${
+                        pagination.page === pageNum
+                          ? "bg-teal-700 text-white"
+                          : "bg-white text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.totalPages}
+                  className="btn btn-secondary btn-sm h-[34px] px-3 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  Next <ChevronRight size={12} />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -736,24 +1053,249 @@ const UsersSection = ({ users, admins, currentUserId, onDelete, onExport }) => {
 /* ------------------------------------------------------------------ */
 /*  Transactions                                                       */
 /* ------------------------------------------------------------------ */
-const TransactionsSection = ({ rows, onExport }) => {
+const TransactionsSection = ({ onExport }) => {
+  const [rows, setRows] = useState([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+  });
   const [query, setQuery] = useState("");
   const [type, setType] = useState("all");
+  const [category, setCategory] = useState("All");
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [userMap, setUserMap] = useState({});
+  const [categoryOptions, setCategoryOptions] = useState(["All"]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = useMemo(() => {
-    const value = query.trim().toLowerCase();
-    return rows.filter((item) => {
-      const matchesType = type === "all" || item.type === type;
-      const matchesQuery =
-        !value ||
-        String(item.title || "").toLowerCase().includes(value) ||
-        String(item.userName || "").toLowerCase().includes(value) ||
-        String(item.category || "").toLowerCase().includes(value);
-      return matchesType && matchesQuery;
-    });
-  }, [rows, query, type]);
+  const fetchUserMap = async () => {
+    try {
+      const all = [];
+      let page = 1;
+      const limit = 100;
+      for (;;) {
+        const res = await api.get(`/user?page=${page}&limit=${limit}`);
+        const body = res.data || {};
+        all.push(...(body.users || []), ...(body.admins || []));
+        if (page >= (body.pagination?.totalPages || 1)) break;
+        page += 1;
+        if (page > 20) break;
+      }
+      const map = {};
+      all.forEach((entry) => {
+        map[entry.id] = entry.name;
+      });
+      setUserMap(map);
+    } catch (error) {
+      console.log("Fetch user map error:", error);
+    }
+  };
 
-  const filteredTotal = filtered.reduce((sum, item) => sum + item.amount, 0);
+  const fetchTransactions = async (page = pagination.page) => {
+    setLoading(true);
+    try {
+      const baseParams = {
+        page,
+        limit: pagination.limit,
+        sort: "newest",
+      };
+      if (query.trim()) baseParams.search = query.trim();
+      if (category !== "All") baseParams.category = category;
+      if (minAmount.trim()) baseParams.minAmount = minAmount;
+      if (maxAmount.trim()) baseParams.maxAmount = maxAmount;
+      if (startDate) baseParams.startDate = startDate;
+      if (endDate) baseParams.endDate = endDate;
+
+      const buildUrl = (extra) => {
+        const params = new URLSearchParams({ ...baseParams, ...extra });
+        return `/expense/user?${params.toString()}`;
+      };
+
+      let expenses = [];
+      let credits = [];
+      let expenseTotal = 0;
+      let creditTotal = 0;
+      let expensePages = 1;
+      let creditPages = 1;
+
+      if (type === "all" || type === "Expense") {
+        const res = await api.get(buildUrl({}));
+        const body = res.data || {};
+        expenses = Array.isArray(body.data) ? body.data : [];
+        expenseTotal = body.pagination?.total ?? 0;
+        expensePages = body.pagination?.totalPages ?? 1;
+      }
+      if (type === "all" || type === "Income") {
+        // Credits use `method`, not `category` – do not send the category
+        // filter to the credit endpoint or all credits would be returned.
+        const creditParams = { ...baseParams };
+        delete creditParams.category;
+        const res = await api.get(`/credit/user?${new URLSearchParams(creditParams).toString()}`);
+        const body = res.data || {};
+        credits = Array.isArray(body.data) ? body.data : [];
+        creditTotal = body.pagination?.total ?? 0;
+        creditPages = body.pagination?.totalPages ?? 1;
+      }
+
+      const merged = [
+        ...expenses.map((item) => ({
+          id: `expense-${item.id}`,
+          type: "Expense",
+          title: item.title,
+          category: item.category || "Other",
+          date: item.date,
+          amount: Number(item.amount || 0),
+          note: item.note,
+          userName: userMap[item.userId] || "Unknown user",
+          userId: item.userId,
+        })),
+        ...credits.map((item) => ({
+          id: `income-${item.id}`,
+          type: "Income",
+          title: item.source,
+          category: item.method || "Other",
+          date: item.date,
+          amount: Number(item.amount || 0),
+          note: item.note,
+          userName: userMap[item.userId] || "Unknown user",
+          userId: item.userId,
+        })),
+      ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      // Derive category options dynamically from actual data
+      const dynamicCategories = [
+        "All",
+        ...[
+          ...new Set(merged.map((item) => item.category).filter(Boolean)),
+        ].sort((a, b) => a.localeCompare(b)),
+      ];
+      setCategoryOptions(dynamicCategories);
+
+      setRows(merged);
+      setPagination((prev) => ({
+        ...prev,
+        page,
+        total: expenseTotal + creditTotal,
+        totalPages: Math.max(expensePages, creditPages),
+      }));
+    } catch (error) {
+      console.log("Fetch transactions error:", error);
+      toast.error("Could not load transactions");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserMap();
+    fetchTransactions();
+  }, [query, type, category, minAmount, maxAmount, startDate, endDate, pagination.limit]);
+
+  const handlePageChange = (page) => {
+    if (page < 1 || page > pagination.totalPages) return;
+    setPagination((prev) => ({ ...prev, page }));
+    fetchTransactions(page);
+  };
+
+  const handleExport = async () => {
+    try {
+      const all = await fetchAllTransactions();
+      if (all.length === 0) {
+        toast.info("There are no transactions to export yet.");
+        return;
+      }
+      downloadCsv(`expense-tracker-platform-transactions-${todayISO()}.csv`, [
+        ["Date", "Type", "Title", "Category / Method", "User", "Amount (INR)"],
+        ...all.map((item) => [
+          item.date?.slice(0, 10) || "",
+          item.type,
+          item.title,
+          item.category,
+          item.userName,
+          item.amount,
+        ]),
+      ]);
+      toast.success("Platform transactions exported");
+    } catch (error) {
+      toast.error("Could not export transactions");
+    }
+  };
+
+  const fetchAllTransactions = async () => {
+    const all = [];
+    let page = 1;
+    const limit = 100;
+    for (;;) {
+      const params = new URLSearchParams({
+        page,
+        limit,
+        sort: "newest",
+      });
+      if (query.trim()) params.set("search", query.trim());
+      if (category !== "All") params.set("category", category);
+      if (minAmount.trim()) params.set("minAmount", minAmount);
+      if (maxAmount.trim()) params.set("maxAmount", maxAmount);
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+
+      // Credits use `method`, not `category` – build credit params without
+      // category so all credits aren't returned when filtering by category.
+      const creditParams = new URLSearchParams();
+      for (const [key, value] of params) {
+        if (key !== "category") creditParams.set(key, value);
+      }
+
+      const [expRes, credRes] = await Promise.all([
+        api.get(`/expense/user?${params.toString()}`),
+        api.get(`/credit/user?${creditParams.toString()}`),
+      ]);
+      const expBody = expRes.data || {};
+      const credBody = credRes.data || {};
+      const exps = Array.isArray(expBody.data) ? expBody.data : [];
+      const creds = Array.isArray(credBody.data) ? credBody.data : [];
+      all.push(
+        ...exps.map((item) => ({
+          id: `expense-${item.id}`,
+          type: "Expense",
+          title: item.title,
+          category: item.category || "Other",
+          date: item.date,
+          amount: Number(item.amount || 0),
+          userName: userMap[item.userId] || "Unknown user",
+        })),
+        ...creds.map((item) => ({
+          id: `income-${item.id}`,
+          type: "Income",
+          title: item.source,
+          category: item.method || "Other",
+          date: item.date,
+          amount: Number(item.amount || 0),
+          userName: userMap[item.userId] || "Unknown user",
+        }))
+      );
+      if (exps.length < limit && creds.length < limit) break;
+      page += 1;
+      if (page > 20) break;
+    }
+    return all
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 1000);
+  };
+
+  const filteredTotal = rows.reduce((sum, item) => sum + item.amount, 0);
+
+  const hasFilters =
+    query.trim() ||
+    type !== "all" ||
+    category !== "All" ||
+    minAmount.trim() ||
+    maxAmount.trim() ||
+    startDate ||
+    endDate;
 
   return (
     <div className="surface overflow-hidden">
@@ -761,22 +1303,29 @@ const TransactionsSection = ({ rows, onExport }) => {
         <SectionTitle
           icon={List}
           title="Monitor transactions"
-          subtitle={`${rows.length} total entries across the platform`}
+          subtitle={
+            hasFilters
+              ? `Filtered transactions · ${pagination.total} total match${pagination.total === 1 ? "" : "es"}`
+              : `${pagination.total} total entries across the platform`
+          }
         />
-        <button type="button" onClick={onExport} className="btn btn-secondary btn-sm">
+        <button type="button" onClick={handleExport} className="btn btn-secondary btn-sm">
           <Download size={14} />
           Export CSV
         </button>
       </div>
 
-      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center">
+      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
         <SearchInput
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPagination((prev) => ({ ...prev, page: 1 }));
+          }}
           placeholder="Search by title, user or category…"
-          className="flex-1"
+          className="flex-1 lg:w-[300px]"
         />
-        <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+        <div className="flex gap-2 w-full lg:w-auto">
           {[
             { key: "all", label: "All" },
             { key: "Expense", label: "Expenses" },
@@ -785,7 +1334,10 @@ const TransactionsSection = ({ rows, onExport }) => {
             <button
               key={option.key}
               type="button"
-              onClick={() => setType(option.key)}
+              onClick={() => {
+                setType(option.key);
+                setPagination((prev) => ({ ...prev, page: 1 }));
+              }}
               className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
                 type === option.key
                   ? "bg-white text-slate-900 shadow-sm"
@@ -795,23 +1347,112 @@ const TransactionsSection = ({ rows, onExport }) => {
               {option.label}
             </button>
           ))}
+          <select
+            value={category}
+            onChange={(event) => {
+              setCategory(event.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            className="field h-[42px] py-0 sm:w-[170px]"
+            aria-label="Filter by category"
+          >
+            {categoryOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
         </div>
+      </div>
+
+      <div className="flex gap-2 w-full lg:flex-row lg:items-center">
+        <div className="flex gap-2">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={minAmount}
+            onChange={(event) => {
+              setMinAmount(event.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            placeholder="Min amount"
+            className="field h-[42px] py-0 w-[120px] text-sm"
+            aria-label="Minimum amount"
+          />
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={maxAmount}
+            onChange={(event) => {
+              setMaxAmount(event.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            placeholder="Max amount"
+            className="field h-[42px] py-0 w-[120px] text-sm"
+            aria-label="Maximum amount"
+          />
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={startDate}
+            onChange={(event) => {
+              setStartDate(event.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            className="field h-[42px] py-0 w-[140px] text-sm"
+            aria-label="Start date"
+          />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(event) => {
+              setEndDate(event.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            className="field h-[42px] py-0 w-[140px] text-sm"
+            aria-label="End date"
+          />
+        </div>
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              setType("all");
+              setCategory("All");
+              setMinAmount("");
+              setMaxAmount("");
+              setStartDate("");
+              setEndDate("");
+              setPagination({ page: 1, limit: 20, total: 0, totalPages: 0 });
+            }}
+            className="btn btn-ghost btn-sm h-[42px] text-slate-500"
+          >
+            <X size={14} />
+            Clear
+          </button>
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-2.5">
         <p className="text-[10.5px] font-medium text-slate-500">
-          {filtered.length} {filtered.length === 1 ? "entry" : "entries"} shown
+          {rows.length} {rows.length === 1 ? "entry" : "entries"} on this page
         </p>
         <p className="text-[10.5px] font-bold text-slate-700">
           Total: {formatMoney(filteredTotal)}
         </p>
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <PageLoader label="Loading transactions…" className="h-[300px]" />
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={List}
           title="No transactions found"
-          description="Try a different search term or change the transaction type filter."
+          description="Try a different search term or change the filters."
           className="py-10"
         />
       ) : (
@@ -828,7 +1469,7 @@ const TransactionsSection = ({ rows, onExport }) => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0, 100).map((item) => (
+                {rows.map((item) => (
                   <tr key={item.id}>
                     <td>
                       <Badge tone={item.type === "Expense" ? "rose" : "emerald"}>
@@ -841,7 +1482,9 @@ const TransactionsSection = ({ rows, onExport }) => {
                       </Badge>
                     </td>
                     <td>
-                      <p className="text-[13px] font-semibold text-slate-800">{item.title}</p>
+                      <p className="text-[13px] font-semibold text-slate-800">
+                        {item.title}
+                      </p>
                       <p className="text-[10.5px] text-slate-500">{item.category}</p>
                     </td>
                     <td className="whitespace-nowrap text-xs text-slate-600">
@@ -865,7 +1508,7 @@ const TransactionsSection = ({ rows, onExport }) => {
           </div>
 
           <div className="divide-y divide-slate-100 md:hidden">
-            {filtered.slice(0, 50).map((item) => (
+            {rows.map((item) => (
               <div key={item.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -893,6 +1536,59 @@ const TransactionsSection = ({ rows, onExport }) => {
               </div>
             ))}
           </div>
+
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 sm:px-6 bg-slate-50/60">
+              <div className="text-[11px] text-slate-500">
+                Page <strong>{pagination.page}</strong> of{" "}
+                <strong>{Math.max(1, pagination.totalPages)}</strong>
+                · {pagination.total} total{" "}
+                {pagination.total === 1 ? "entry" : "entries"}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                  className="btn btn-secondary btn-sm h-[34px] px-3 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  <ChevronLeft size={12} />
+                  Prev
+                </button>
+                {[...Array(Math.max(1, pagination.totalPages))].map((_, i) => {
+                  const pageNum = i + 1;
+                  const show =
+                    pagination.totalPages <= 5 ||
+                    pageNum === 1 ||
+                    pageNum === pagination.totalPages ||
+                    Math.abs(pageNum - pagination.page) <= 1;
+                  if (!show) return null;
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`btn btn-sm h-[34px] w-[34px] ${
+                        pagination.page === pageNum
+                          ? "bg-teal-700 text-white"
+                          : "bg-white text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.totalPages}
+                  className="btn btn-secondary btn-sm h-[34px] px-3 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  Next <ChevronRight size={12} />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -1178,22 +1874,162 @@ const ReportsSection = ({ stats, categoryData, rows }) => {
 /* ------------------------------------------------------------------ */
 /*  Audit logs                                                         */
 /* ------------------------------------------------------------------ */
-const AuditLogsSection = ({ logs, onExport }) => {
+const AuditLogsSection = ({ onExport }) => {
+  const [logs, setLogs] = useState([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+  });
   const [query, setQuery] = useState("");
-  const [type, setType] = useState("all");
+  const [action, setAction] = useState("all");
+  const [module, setModule] = useState("all");
+  const [user, setUser] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [userMap, setUserMap] = useState({});
+  const [actionOptions, setActionOptions] = useState(["all"]);
+  const [moduleOptions, setModuleOptions] = useState(["all"]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = useMemo(() => {
-    const value = query.trim().toLowerCase();
-    return logs.filter((log) => {
-      const matchesType = type === "all" || log.type === type;
-      const matchesQuery =
-        !value ||
-        String(log.action || "").toLowerCase().includes(value) ||
-        String(log.actor || "").toLowerCase().includes(value) ||
-        String(log.target || "").toLowerCase().includes(value);
-      return matchesType && matchesQuery;
-    });
-  }, [logs, query, type]);
+  const fetchUserMap = async () => {
+    try {
+      const all = [];
+      let page = 1;
+      const limit = 100;
+      for (;;) {
+        const res = await api.get(`/user?page=${page}&limit=${limit}`);
+        const body = res.data || {};
+        all.push(...(body.users || []), ...(body.admins || []));
+        if (page >= (body.pagination?.totalPages || 1)) break;
+        page += 1;
+        if (page > 20) break;
+      }
+      const map = {};
+      all.forEach((entry) => {
+        map[entry.id] = entry.name;
+      });
+      setUserMap(map);
+    } catch (error) {
+      console.log("Fetch user map error:", error);
+    }
+  };
+
+  const fetchLogs = async (page = pagination.page) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", page);
+      params.set("limit", pagination.limit);
+      if (query.trim()) params.set("user", query.trim());
+      if (action !== "all") params.set("action", action);
+      if (module !== "all") params.set("module", module);
+      if (user.trim()) params.set("user", user.trim());
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+
+      const res = await api.get(`/audit?${params.toString()}`);
+      const body = res.data || {};
+      const pageLogs = Array.isArray(body.data) ? body.data : [];
+      setLogs(
+        pageLogs.map((log) => ({
+          ...log,
+          actor: userMap[log.userId] || log.actor || "Unknown user",
+        }))
+      );
+
+      // Derive action and module options dynamically from actual data
+      const dynamicActions = [
+        "all",
+        ...[...new Set(pageLogs.map((log) => log.action).filter(Boolean))].sort(),
+      ];
+      const dynamicModules = [
+        "all",
+        ...[...new Set(pageLogs.map((log) => log.module).filter(Boolean))].sort(),
+      ];
+      setActionOptions(dynamicActions);
+      setModuleOptions(dynamicModules);
+
+      setPagination((prev) => ({
+        ...prev,
+        page,
+        total: body.pagination?.total ?? 0,
+        totalPages: body.pagination?.totalPages ?? 0,
+      }));
+    } catch (error) {
+      console.log("Fetch audit logs error:", error);
+      toast.error("Could not load audit logs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserMap();
+    fetchLogs();
+  }, [query, action, module, user, startDate, endDate, pagination.limit]);
+
+  const handlePageChange = (page) => {
+    if (page < 1 || page > pagination.totalPages) return;
+    setPagination((prev) => ({ ...prev, page }));
+    fetchLogs(page);
+  };
+
+  const handleExport = async () => {
+    try {
+      const all = await fetchAllAuditLogs();
+      if (all.length === 0) {
+        toast.info("There are no audit records to export yet.");
+        return;
+      }
+      downloadCsv(`expense-tracker-audit-logs-${todayISO()}.csv`, [
+        ["Time", "Action", "Actor", "Target", "Amount (INR)", "Type"],
+        ...all.map((log) => [
+          log.date ? new Date(log.date).toISOString() : "",
+          log.action,
+          log.actor,
+          log.target,
+          log.amount,
+          log.type,
+        ]),
+      ]);
+      toast.success("Audit trail exported");
+    } catch (error) {
+      toast.error("Could not export audit trail");
+    }
+  };
+
+  const fetchAllAuditLogs = async () => {
+    const all = [];
+    let page = 1;
+    const limit = 100;
+    for (;;) {
+      const params = new URLSearchParams({ page, limit });
+      if (query.trim()) params.set("user", query.trim());
+      if (action !== "all") params.set("action", action);
+      if (module !== "all") params.set("module", module);
+      if (user.trim()) params.set("user", user.trim());
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      const res = await api.get(`/audit?${params.toString()}`);
+      const body = res.data || {};
+      const pageLogs = Array.isArray(body.data) ? body.data : [];
+      all.push(...pageLogs);
+      if (pageLogs.length < limit) break;
+      page += 1;
+      if (page > 20) break;
+    }
+    return all;
+  };
+
+  const hasFilters =
+    query.trim() ||
+    action !== "all" ||
+    module !== "all" ||
+    user.trim() ||
+    startDate ||
+    endDate;
 
   return (
     <div className="surface overflow-hidden">
@@ -1201,48 +2037,125 @@ const AuditLogsSection = ({ logs, onExport }) => {
         <SectionTitle
           icon={FileText}
           title="Audit logs"
-          subtitle="Derived from platform transaction activity"
+          subtitle={
+            hasFilters
+              ? `Filtered audit trail · ${pagination.total} total match${pagination.total === 1 ? "" : "es"}`
+              : "Platform audit trail (server-side)"
+          }
         />
-        <button type="button" onClick={onExport} className="btn btn-secondary btn-sm">
+        <button type="button" onClick={handleExport} className="btn btn-secondary btn-sm">
           <Download size={14} />
           Export trail
         </button>
       </div>
 
-      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center">
+      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
         <SearchInput
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPagination((prev) => ({ ...prev, page: 1 }));
+          }}
           placeholder="Search actions, actors or targets…"
-          className="flex-1"
+          className="flex-1 lg:w-[280px]"
         />
-        <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
-          {[
-            { key: "all", label: "All" },
-            { key: "Expense", label: "Expenses" },
-            { key: "Income", label: "Income" },
-          ].map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => setType(option.key)}
-              className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
-                type === option.key
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="flex gap-2 w-full lg:w-auto">
+          <select
+            value={action}
+            onChange={(event) => {
+              setAction(event.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            className="field h-[42px] py-0 sm:w-[150px]"
+            aria-label="Filter by action"
+          >
+            {actionOptions.map((item) => (
+              <option key={item} value={item}>
+                {item === "all" ? "All actions" : item}
+              </option>
+            ))}
+          </select>
+          <select
+            value={module}
+            onChange={(event) => {
+              setModule(event.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            className="field h-[42px] py-0 sm:w-[150px]"
+            aria-label="Filter by module"
+          >
+            {moduleOptions.map((item) => (
+              <option key={item} value={item}>
+                {item === "all" ? "All modules" : item}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      <div className="flex gap-2 w-full lg:flex-row lg:items-center">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={user}
+            onChange={(event) => {
+              setUser(event.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            placeholder="Filter by user (name or id)…"
+            className="field h-[42px] py-0 w-[220px] text-sm"
+            aria-label="Filter audit logs by user"
+          />
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={startDate}
+            onChange={(event) => {
+              setStartDate(event.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            className="field h-[42px] py-0 w-[140px] text-sm"
+            aria-label="Start date"
+          />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(event) => {
+              setEndDate(event.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            className="field h-[42px] py-0 w-[140px] text-sm"
+            aria-label="End date"
+          />
+        </div>
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              setAction("all");
+              setModule("all");
+              setUser("");
+              setStartDate("");
+              setEndDate("");
+              setPagination({ page: 1, limit: 20, total: 0, totalPages: 0 });
+            }}
+            className="btn btn-ghost btn-sm h-[42px] text-slate-500"
+          >
+            <X size={14} />
+            Clear
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <PageLoader label="Loading audit logs…" className="h-[300px]" />
+      ) : logs.length === 0 ? (
         <EmptyState
           icon={FileText}
           title="No audit records found"
-          description="Try a different search term or type filter."
+          description="Try a different search term or change the filters."
           className="py-10"
         />
       ) : (
@@ -1253,6 +2166,7 @@ const AuditLogsSection = ({ logs, onExport }) => {
                 <tr>
                   <th>Time</th>
                   <th>Action</th>
+                  <th>Module</th>
                   <th>Actor</th>
                   <th>Target</th>
                   <th className="text-right">Amount</th>
@@ -1260,7 +2174,7 @@ const AuditLogsSection = ({ logs, onExport }) => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0, 100).map((log) => (
+                {logs.map((log) => (
                   <tr key={log.id}>
                     <td className="whitespace-nowrap text-[11px] text-slate-500">
                       {formatDateTime(log.date)}
@@ -1268,16 +2182,21 @@ const AuditLogsSection = ({ logs, onExport }) => {
                     <td className="whitespace-nowrap text-[13px] font-semibold text-slate-800">
                       {log.action}
                     </td>
-                    <td className="whitespace-nowrap text-xs text-slate-600">{log.actor}</td>
+                    <td className="whitespace-nowrap text-xs text-slate-500">
+                      {log.module}
+                    </td>
+                    <td className="whitespace-nowrap text-xs text-slate-600">
+                      {log.actor}
+                    </td>
                     <td className="max-w-[220px] truncate text-xs text-slate-600">
-                      {log.target}
+                      {log.details || log.target || "—"}
                     </td>
                     <td className="whitespace-nowrap text-right text-xs font-bold text-slate-700">
                       {formatMoney(log.amount)}
                     </td>
                     <td className="text-right">
                       <Badge tone={log.type === "Expense" ? "rose" : "emerald"}>
-                        {log.type}
+                        {log.type || "—"}
                       </Badge>
                     </td>
                   </tr>
@@ -1287,19 +2206,23 @@ const AuditLogsSection = ({ logs, onExport }) => {
           </div>
 
           <div className="divide-y divide-slate-100 md:hidden">
-            {filtered.slice(0, 50).map((log) => (
+            {logs.map((log) => (
               <div key={log.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-slate-800">{log.action}</p>
+                    <p className="text-[13px] font-semibold text-slate-800">
+                      {log.action}
+                    </p>
                     <p className="mt-0.5 text-[10.5px] text-slate-500">
                       {log.actor} · {formatDateTime(log.date)}
                     </p>
-                    <p className="mt-1 truncate text-[11px] text-slate-400">{log.target}</p>
+                    <p className="mt-1 truncate text-[11px] text-slate-400">
+                      {log.details || log.target || "—"}
+                    </p>
                   </div>
                   <div className="text-right">
                     <Badge tone={log.type === "Expense" ? "rose" : "emerald"}>
-                      {log.type}
+                      {log.type || "—"}
                     </Badge>
                     <p className="mt-1 text-[11px] font-bold text-slate-700">
                       {formatMoney(log.amount)}
@@ -1309,6 +2232,59 @@ const AuditLogsSection = ({ logs, onExport }) => {
               </div>
             ))}
           </div>
+
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 sm:px-6 bg-slate-50/60">
+              <div className="text-[11px] text-slate-500">
+                Page <strong>{pagination.page}</strong> of{" "}
+                <strong>{Math.max(1, pagination.totalPages)}</strong>
+                · {pagination.total} total{" "}
+                {pagination.total === 1 ? "record" : "records"}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                  className="btn btn-secondary btn-sm h-[34px] px-3 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  <ChevronLeft size={12} />
+                  Prev
+                </button>
+                {[...Array(Math.max(1, pagination.totalPages))].map((_, i) => {
+                  const pageNum = i + 1;
+                  const show =
+                    pagination.totalPages <= 5 ||
+                    pageNum === 1 ||
+                    pageNum === pagination.totalPages ||
+                    Math.abs(pageNum - pagination.page) <= 1;
+                  if (!show) return null;
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`btn btn-sm h-[34px] w-[34px] ${
+                        pagination.page === pageNum
+                          ? "bg-teal-700 text-white"
+                          : "bg-white text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.totalPages}
+                  className="btn btn-secondary btn-sm h-[34px] px-3 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  Next <ChevronRight size={12} />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -1318,7 +2294,7 @@ const AuditLogsSection = ({ logs, onExport }) => {
 /* ------------------------------------------------------------------ */
 /*  Security                                                           */
 /* ------------------------------------------------------------------ */
-const SecuritySection = ({ logs, onExportAudit }) => {
+const SecuritySection = ({ onExportAudit }) => {
   const { user, logout } = useAuth();
   const [showLogout, setShowLogout] = useState(false);
 
@@ -1452,7 +2428,7 @@ const SecuritySection = ({ logs, onExportAudit }) => {
           <SectionTitle
             icon={FileText}
             title="Audit & compliance"
-            subtitle={`${logs.length} recent activity records`}
+            subtitle="Platform security and audit controls"
           />
           <p className="mt-4 text-[11.5px] leading-relaxed text-slate-500">
             Export a timestamped record of recent platform transaction activity for

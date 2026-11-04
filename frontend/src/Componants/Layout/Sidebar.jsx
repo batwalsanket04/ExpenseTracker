@@ -14,11 +14,12 @@ import {
   ArrowLeftRight,
   FileText,
   Lock,
-  Settings,
   LogOut,
   Sparkles,
   X,
-  ChevronRight,
+  Settings,
+  Sliders,
+  Bell,
 } from "lucide-react";
 
 const workspaceNav = [
@@ -28,6 +29,7 @@ const workspaceNav = [
   { label: "Income", to: "/dashboard/show-credits", icon: PiggyBank },
   { label: "Budgets", to: "/dashboard/budgets", icon: PieChart },
   { label: "Reports", to: "/dashboard/reports", icon: BarChart3 },
+  { label: "Notifications", to: "/dashboard/notifications", icon: Bell },
 ];
 
 const adminNav = [
@@ -44,6 +46,7 @@ const adminNav = [
 
 const accountNav = [
   { label: "Settings", to: "/dashboard/setting", icon: Settings },
+  { label: "Preferences", to: "/dashboard/preferences", icon: Sliders },
 ];
 
 const SidebarLink = ({ item, active, onNavigate }) => {
@@ -198,12 +201,12 @@ const Sidebar = ({ onNavigate }) => {
         </div>
 
         <Link
-          to="/dashboard/setting"
+          to="/dashboard/preferences"
           onClick={onNavigate}
           className="mt-2 flex items-center justify-center gap-1 text-[10px] font-medium text-slate-400 transition hover:text-teal-700"
         >
-          Manage account
-          <ChevronRight size={11} />
+          Preferences
+          <Sliders size={11} />
         </Link>
       </div>
 

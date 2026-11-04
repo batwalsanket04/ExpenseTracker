@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../Context/storeContext";
 import { Avatar, Logo } from "../../components/ui";
+import api from "../../utils/api";
 import {
   BarChart3,
   CalendarDays,
@@ -10,6 +11,7 @@ import {
   Menu,
   Plus,
   Settings,
+  Bell,
 } from "lucide-react";
 
 const PAGE_TITLES = {
@@ -27,7 +29,12 @@ const Navbar = ({ onMenuClick }) => {
   const { user, role, logout } = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
+  const [notifDropdownNotifs, setNotifDropdownNotifs] = useState([]);
+  const [notifDropdownLoading, setNotifDropdownLoading] = useState(false);
   const menuRef = useRef(null);
+  const notifMenuRef = useRef(null);
 
   const displayName = user?.name || localStorage.getItem("userName") || "User";
   const displayEmail = user?.email || "Signed in";
@@ -39,6 +46,18 @@ const Navbar = ({ onMenuClick }) => {
     day: "2-digit",
     month: "short",
   });
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await api.get("/notifications/unread-count");
+        setUnreadCount(res.data.unreadCount || 0);
+      } catch (error) {
+        // Silently ignore; notifications may not be available yet.
+      }
+    };
+    fetchUnreadCount();
+  }, []);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -53,6 +72,47 @@ const Navbar = ({ onMenuClick }) => {
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Refresh badge when the Notifications page marks items read / deleted
+  useEffect(() => {
+    const onNotifChange = (event) => {
+      const delta = event.detail?.delta;
+      if (delta !== undefined) {
+        setUnreadCount((prev) => Math.max(0, prev + delta));
+      }
+      fetchUnreadCount();
+    };
+    window.addEventListener("notifications:changed", onNotifChange);
+    return () => window.removeEventListener("notifications:changed", onNotifChange);
+  }, []);
+
+  const fetchDropdownNotifications = async () => {
+    setNotifDropdownLoading(true);
+    try {
+      const res = await api.get("/notifications/?limit=5&unreadOnly=false");
+      const data = res.data.data || [];
+      setNotifDropdownNotifs(data);
+    } catch (error) {
+      console.log("Fetch dropdown notifications error:", error);
+      setNotifDropdownNotifs([]);
+    } finally {
+      setNotifDropdownLoading(false);
+    }
+  };
+
+  const handleNotifClickOutside = (event) => {
+    if (
+      notifMenuRef.current &&
+      !notifMenuRef.current.contains(event.target)
+    ) {
+      setNotifDropdownOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener("mousedown", handleNotifClickOutside);
+    return () => document.removeEventListener("mousedown", handleNotifClickOutside);
   }, []);
 
   return (
@@ -105,6 +165,96 @@ const Navbar = ({ onMenuClick }) => {
         >
           <Plus size={18} />
         </Link>
+
+        {/* Notifications bell */}
+        <div
+          ref={notifMenuRef}
+          className="relative"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setNotifDropdownOpen((open) => !open);
+              if (!notifDropdownOpen) fetchDropdownNotifications();
+            }}
+            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+            aria-label="Notifications"
+            aria-haspopup="menu"
+            aria-expanded={notifDropdownOpen}
+          >
+            <Bell
+              size={16}
+              className={`text-slate-600 transition ${unreadCount > 0 ? "text-teal-600" : ""}`}
+            />
+            {unreadCount > 0 && (
+              <span
+                className="absolute top-[-2px] right-[-2px] z-20 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white ring-2 ring-white shadow-sm"
+              >
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {notifDropdownOpen && (
+            <div
+              className="absolute right-0 top-[calc(100%+8px)] z-50 w-80 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl shadow-slate-900/10 animate-fade-up"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 p-4">
+                <h3 className="text-sm font-semibold text-slate-900">Notifications</h3>
+                <Link
+                  to="/dashboard/notifications"
+                  className="text-[11px] font-medium text-teal-600 hover:text-teal-700"
+                >
+                  View all
+                </Link>
+              </div>
+
+              <div className="p-1.5 max-h-[300px] overflow-y-auto">
+                {notifDropdownLoading ? (
+                  <div className="flex h-32 items-center justify-center text-slate-400 text-xs">
+                    Loading…
+                  </div>
+                ) : notifDropdownNotifs.length === 0 ? (
+                  <div className="flex h-32 flex-col items-center justify-center text-slate-400 text-xs">
+                    <p>No notifications</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {notifDropdownNotifs.map((n) => (
+                      <Link
+                        key={n.id}
+                        to="/dashboard/notifications"
+                        onClick={() => setNotifDropdownOpen(false)}
+                        className="flex items-start gap-3 rounded-xl px-3 py-2.5 transition hover:bg-slate-50"
+                      >
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                          n.read ? "bg-slate-100" : "bg-teal-50"
+                        }`}>
+                          <Bell size={13} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11.5px] font-medium text-slate-900 truncate leading-tight">
+                            {n.title}
+                          </p>
+                          <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                            {n.message}
+                          </p>
+                          <p className="text-[9px] text-slate-400 mt-1">
+                            {new Date(n.createdAt).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Account menu */}
         <div ref={menuRef} className="relative">

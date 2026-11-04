@@ -1,8 +1,41 @@
 const bcrypt = require("bcryptjs");
 const { logError } = require("../config/logger");
 const { User, Admin } = require("../models");
+const { Op } = require("sequelize");
 
 const modelByRole = (role) => (role === "admin" ? Admin : User);
+
+/**
+ * Parse and sanitize pagination params.
+ */
+const getPagination = (query) => {
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const limit = Math.min(
+    100,
+    Math.max(1, parseInt(query.limit, 10) || 20)
+  );
+  const offset = (page - 1) * limit;
+  return { page, limit, offset };
+};
+
+const paginateModel = async (Model, where, { page, limit, offset }) => {
+  const { count, rows } = await Model.findAndCountAll({
+    attributes: { exclude: ["password"] },
+    where,
+    order: [["createdAt", "DESC"]],
+    limit,
+    offset,
+  });
+  return {
+    data: rows,
+    pagination: {
+      page,
+      limit,
+      total: count,
+      totalPages: Math.ceil(count / limit),
+    },
+  };
+};
 
 const getUsers = async (req, res) => {
   try {
@@ -13,13 +46,63 @@ const getUsers = async (req, res) => {
       });
     }
 
-    const users = await User.findAll({
-      attributes: { exclude: ["password"] },
+    const { page, limit, offset } = getPagination(req.query);
+    const { search, role } = req.query;
+
+    const userWhere = {};
+    const adminWhere = {};
+    let skipUsers = false;
+    let skipAdmins = false;
+
+    if (search) {
+      const like = `%${search}%`;
+      userWhere[Op.or] = [
+        { name: { [Op.iLike]: like } },
+        { email: { [Op.iLike]: like } },
+      ];
+      adminWhere[Op.or] = [
+        { name: { [Op.iLike]: like } },
+        { email: { [Op.iLike]: like } },
+      ];
+    }
+
+    if (role) {
+      if (role === "admin") {
+        skipUsers = true; // Only admins table
+      } else if (role === "user") {
+        skipAdmins = true; // Only users table
+      }
+    }
+
+    const emptyPage = {
+      data: [],
+      pagination: { page, limit, total: 0, totalPages: 0 },
+    };
+
+    const queries = [
+      skipUsers
+        ? Promise.resolve(emptyPage)
+        : paginateModel(User, userWhere, { page, limit, offset }),
+      skipAdmins
+        ? Promise.resolve(emptyPage)
+        : paginateModel(Admin, adminWhere, { page, limit, offset }),
+    ];
+
+    const [usersResult, adminsResult] = await Promise.all(queries);
+
+    return res.status(200).json({
+      users: usersResult.data,
+      admins: adminsResult.data,
+      pagination: {
+        page,
+        limit,
+        total: usersResult.pagination.total + adminsResult.pagination.total,
+        totalPages: Math.max(
+          usersResult.pagination.totalPages,
+          adminsResult.pagination.totalPages
+        ),
+      },
     });
-    const admins = await Admin.findAll({
-      attributes: { exclude: ["password"] },
-    });
-    return res.status(200).json({ users, admins });
   } catch (error) {
     logError(req, "Get users failed", error);
     return res.status(500).json({ message: "Server error" });

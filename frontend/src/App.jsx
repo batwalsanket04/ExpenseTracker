@@ -9,6 +9,8 @@ import AddTransaction from "./Componants/Layout/AddTransaction/AddTransaction";
 import ShowExpense from "./Pages/Expenses/ShowExpense";
 import ShowCredits from "./Pages/Credit/showCredits";
 import Setting from "./Pages/Setting/Setting";
+import PreferencesMatrix from "./Pages/Setting/PreferencesMatrix";
+import Notifications from "./Pages/Notifications/Notifications";
 import FallBack from "./Pages/FallBack/FallBack";
 import Overview from "./Pages/Dashboard/Overview";
 import Budgets from "./Pages/Dashboard/Budgets";
@@ -41,6 +43,8 @@ const App = () => {
             <Route path="show-expense" element={<ShowExpense />} />
             <Route path="show-credits" element={<ShowCredits />} />
             <Route path="setting" element={<Setting />} />
+            <Route path="preferences" element={<PreferencesMatrix />} />
+            <Route path="notifications" element={<Notifications />} />
             <Route path="budgets" element={<Budgets />} />
             <Route path="reports" element={<Reports />} />
             <Route

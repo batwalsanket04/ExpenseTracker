@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Layers3,
   Pencil,
   Plus,
@@ -25,20 +27,65 @@ import {
 import { getCategoryMeta } from "../../utils/categoryMeta";
 import { formatDate, formatMoney } from "../../utils/format";
 
+const PAGE_LIMIT = 10;
+
 const ShowExpense = () => {
   const [data, setData] = useState([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: PAGE_LIMIT,
+    total: 0,
+    totalPages: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [sort, setSort] = useState("newest");
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [categories, setCategories] = useState([]);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = async (page = pagination.page) => {
     try {
-      const response = await api.get("/expense/user");
-      setData(Array.isArray(response.data) ? response.data : []);
+      setLoading(true);
+      const params = new URLSearchParams();
+      params.set("page", page);
+      params.set("limit", pagination.limit);
+      params.set("sort", sort);
+      if (search.trim()) params.set("search", search.trim());
+      if (category !== "All") params.set("category", category);
+      if (minAmount.trim()) params.set("minAmount", minAmount);
+      if (maxAmount.trim()) params.set("maxAmount", maxAmount);
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+
+      const response = await api.get(`/expense/user?${params.toString()}`);
+      const body = response.data || {};
+      const expenses = Array.isArray(body.data) ? body.data : [];
+      setData(expenses);
+      setPagination((prev) => ({
+        ...prev,
+        page,
+        total: body.pagination?.total ?? 0,
+        totalPages: body.pagination?.totalPages ?? 0,
+      }));
+
+      // Build category list for the filter dropdown from all known categories.
+      // Categories come from the current page; refresh options as pages change.
+      const pageCats = [
+        ...new Set(expenses.map((item) => item.category).filter(Boolean)),
+      ].sort((a, b) => a.localeCompare(b));
+      setCategories((current) => {
+        const merged = [...new Set([...current, ...pageCats])].sort((a, b) =>
+          a.localeCompare(b)
+        );
+        return merged;
+      });
     } catch (error) {
       console.log("Fetch expenses error:", error);
       toast.error("Could not load your expenses");
@@ -49,42 +96,9 @@ const ShowExpense = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
-
-  const categories = useMemo(
-    () =>
-      [...new Set(data.map((item) => item.category).filter(Boolean))].sort((a, b) =>
-        a.localeCompare(b)
-      ),
-    [data]
-  );
-
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    const rows = data.filter((item) => {
-      const matchesSearch =
-        !query ||
-        String(item.title || "").toLowerCase().includes(query) ||
-        String(item.note || "").toLowerCase().includes(query) ||
-        String(item.category || "").toLowerCase().includes(query);
-      const matchesCategory = category === "All" || item.category === category;
-      return matchesSearch && matchesCategory;
-    });
-
-    return rows.sort((a, b) => {
-      if (sort === "oldest") return new Date(a.date) - new Date(b.date);
-      if (sort === "highest") return Number(b.amount || 0) - Number(a.amount || 0);
-      if (sort === "lowest") return Number(a.amount || 0) - Number(b.amount || 0);
-      return new Date(b.date) - new Date(a.date);
-    });
-  }, [data, search, category, sort]);
+  }, [search, category, sort, minAmount, maxAmount, startDate, endDate, pagination.limit]);
 
   const totalExpense = data.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const filteredTotal = filtered.reduce(
-    (sum, item) => sum + Number(item.amount || 0),
-    0
-  );
   const averageExpense = data.length > 0 ? totalExpense / data.length : 0;
 
   const topCategory = useMemo(() => {
@@ -96,6 +110,20 @@ const ShowExpense = () => {
     const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
     return entries.length > 0 ? { category: entries[0][0], amount: entries[0][1] } : null;
   }, [data]);
+
+  const hasFilters =
+    search.trim() ||
+    category !== "All" ||
+    minAmount.trim() ||
+    maxAmount.trim() ||
+    startDate ||
+    endDate;
+
+  const handlePageChange = (page) => {
+    if (page < 1 || page > pagination.totalPages) return;
+    setPagination((prev) => ({ ...prev, page }));
+    fetchData(page);
+  };
 
   const handleUpdate = (updated) => {
     setData((current) =>
@@ -109,6 +137,10 @@ const ShowExpense = () => {
     try {
       const response = await api.delete(`/expense/${deleteTarget.id}`);
       setData((current) => current.filter((item) => item.id !== deleteTarget.id));
+      setPagination((prev) => ({
+        ...prev,
+        total: Math.max(0, prev.total - 1),
+      }));
       toast.success(response.data?.message || "Expense deleted successfully");
       setDeleteTarget(null);
     } catch (error) {
@@ -123,9 +155,13 @@ const ShowExpense = () => {
     setSearch("");
     setCategory("All");
     setSort("newest");
+    setMinAmount("");
+    setMaxAmount("");
+    setStartDate("");
+    setEndDate("");
+    setPagination({ page: 1, limit: PAGE_LIMIT, total: 0, totalPages: 0 });
+    fetchData(1);
   };
-
-  const hasFilters = search.trim() || category !== "All";
 
   if (loading) return <PageLoader label="Loading your expenses…" />;
 
@@ -134,7 +170,11 @@ const ShowExpense = () => {
       <PageHeader
         eyebrow="Expense history"
         title="Expenses"
-        subtitle="Review, search and manage every expense you've recorded — all in one place."
+        subtitle={
+          hasFilters
+            ? `Showing expenses matching your filters · ${pagination.total} total match${pagination.total === 1 ? "" : "es"}`
+            : "Review, search and manage every expense you've recorded — all in one place."
+        }
         actions={
           <Link to="/dashboard/add-expense" className="btn btn-primary">
             <Plus size={16} strokeWidth={2.5} />
@@ -149,77 +189,122 @@ const ShowExpense = () => {
           value={formatMoney(totalExpense)}
           icon={TrendingDown}
           tone="rose"
-          hint="Across all recorded entries"
+          hint="Sum of expenses on this page"
         />
         <StatCard
           label="Transactions"
           value={data.length}
           icon={Layers3}
           tone="indigo"
-          hint="Expense entries in your history"
+          hint="Expense entries on this page"
         />
         <StatCard
           label="Average expense"
           value={formatMoney(averageExpense)}
           icon={ReceiptText}
           tone="violet"
-          hint="Average value per expense"
+          hint="Average value per expense on this page"
         />
         <StatCard
-          label="Top category"
-          value={topCategory?.category || "—"}
+          label="Total matching"
+          value={pagination.total}
           icon={CalendarDays}
-          tone="amber"
-          hint={topCategory ? formatMoney(topCategory.amount) + " spent" : "No data yet"}
+          tone="teal"
+          hint="Expenses matching your filters across all pages"
         />
       </section>
 
-      {/* Toolbar */}
-      <div className="surface flex flex-col gap-3 p-4 lg:flex-row lg:items-center">
-        <SearchInput
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search by title, note or category…"
-          className="flex-1"
-        />
+      {/* Toolbar – stays in one line; scrolls horizontally on small screens */}
+      <div className="surface p-4 overflow-x-auto overflow-y-hidden no-scrollbar">
+        <div className="min-w-[700px] flex items-center justify-between gap-4 flex-nowrap">
+          <SearchInput
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by title, note or category…"
+            className="flex-1 lg:w-[260px] min-w-[200px]"
+          />
 
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
-          <select
-            value={category}
-            onChange={(event) => setCategory(event.target.value)}
-            className="field h-[42px] py-0 sm:w-[160px]"
-            aria-label="Filter by category"
-          >
-            <option value="All">All categories</option>
-            {categories.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={sort}
-            onChange={(event) => setSort(event.target.value)}
-            className="field h-[42px] py-0 sm:w-[150px]"
-            aria-label="Sort expenses"
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="highest">Highest amount</option>
-            <option value="lowest">Lowest amount</option>
-          </select>
-
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="btn btn-ghost btn-sm h-[42px] text-slate-500"
+          <div className="flex items-center gap-3 flex-nowrap">
+            <select
+              value={category}
+              onChange={(event) => {
+                setCategory(event.target.value);
+                setPagination((prev) => ({ ...prev, page: 1 }));
+              }}
+              className="field h-[42px] py-0 w-[170px] shrink-0"
+              aria-label="Filter by category"
             >
-              <X size={14} />
-              Clear
-            </button>
-          )}
+              <option value="All">All categories</option>
+              {categories.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex items-center gap-2 flex-nowrap">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={minAmount}
+                onChange={(event) => setMinAmount(event.target.value)}
+                placeholder="Min amount"
+                className="field h-[42px] py-0 w-[120px] text-sm shrink-0"
+                aria-label="Minimum amount"
+              />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={maxAmount}
+                onChange={(event) => setMaxAmount(event.target.value)}
+                placeholder="Max amount"
+                className="field h-[42px] py-0 w-[120px] text-sm shrink-0"
+                aria-label="Maximum amount"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 flex-nowrap">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="field h-[42px] py-0 w-[140px] text-sm shrink-0"
+                aria-label="Start date"
+              />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                className="field h-[42px] py-0 w-[140px] text-sm shrink-0"
+                aria-label="End date"
+              />
+            </div>
+
+            <select
+              value={sort}
+              onChange={(event) => setSort(event.target.value)}
+              className="field h-[42px] py-0 w-[150px] shrink-0"
+              aria-label="Sort expenses"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="highest">Highest amount</option>
+              <option value="lowest">Lowest amount</option>
+            </select>
+
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="btn btn-ghost btn-sm h-[42px] text-slate-500 shrink-0"
+              >
+                <X size={14} />
+                Clear
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -230,8 +315,8 @@ const ShowExpense = () => {
               {hasFilters ? "Filtered expenses" : "All expenses"}
             </h2>
             <p className="mt-0.5 text-[11px] text-slate-500">
-              {filtered.length} {filtered.length === 1 ? "entry" : "entries"}
-              {hasFilters ? ` · ${formatMoney(filteredTotal)}` : ""}
+              {data.length} {data.length === 1 ? "entry" : "entries"} on this page
+              {hasFilters ? ` · ${formatMoney(totalExpense)}` : ""}
             </p>
           </div>
           <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-rose-600 ring-1 ring-rose-100">
@@ -252,17 +337,6 @@ const ShowExpense = () => {
               </Link>
             }
           />
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            icon={Search}
-            title="No matching expenses"
-            description="Try a different search term or clear the filters to see everything."
-            action={
-              <button type="button" className="btn btn-secondary btn-sm" onClick={clearFilters}>
-                Clear filters
-              </button>
-            }
-          />
         ) : (
           <>
             {/* Desktop table */}
@@ -278,7 +352,7 @@ const ShowExpense = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((item) => {
+                  {data.map((item) => {
                     const meta = getCategoryMeta(item.category);
                     const CategoryIcon = meta.icon;
                     return (
@@ -344,7 +418,7 @@ const ShowExpense = () => {
 
             {/* Mobile cards */}
             <div className="divide-y divide-slate-100 md:hidden">
-              {filtered.map((item) => {
+              {data.map((item) => {
                 const meta = getCategoryMeta(item.category);
                 const CategoryIcon = meta.icon;
                 return (
@@ -396,6 +470,64 @@ const ShowExpense = () => {
                 );
               })}
             </div>
+
+            {/* Pagination controls */}
+            {pagination.totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 sm:px-6 bg-slate-50/60">
+                <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                  <span>
+                    Page <strong>{pagination.page}</strong> of{" "}
+                    <strong>{pagination.totalPages}</strong>
+                  </span>
+                  <span className="ml-3">
+                    {pagination.total} total
+                    {pagination.total === 1 ? " entry" : " entries"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={pagination.page === 1}
+                    className="btn btn-secondary btn-sm h-[34px] px-3 disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    <ChevronLeft size={12} />
+                    Prev
+                  </button>
+                  {[...Array(pagination.totalPages)].map((_, i) => {
+                    const pageNum = i + 1;
+                    const show =
+                      pagination.totalPages <= 5 ||
+                      pageNum === 1 ||
+                      pageNum === pagination.totalPages ||
+                      Math.abs(pageNum - pagination.page) <= 1;
+                    if (!show) return null;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`btn btn-sm h-[34px] w-[34px] ${
+                          pagination.page === pageNum
+                            ? "bg-teal-700 text-white"
+                            : "bg-white text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={pagination.page === pagination.totalPages}
+                    className="btn btn-secondary btn-sm h-[34px] px-3 disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    Next <ChevronRight size={12} />
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

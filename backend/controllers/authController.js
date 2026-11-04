@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const redis = require("../config/redis");
 const { logger, logError } = require("../config/logger");
 const { User, Admin } = require("../models");
+const { auditLogger } = require("../middleware/auditLogger");
 
 const REFRESH_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
@@ -76,6 +77,14 @@ const register = async (req, res) => {
       role: newUser.role,
     });
 
+    await auditLogger({
+      userId: newUser.id,
+      action: "REGISTER",
+      module: "auth",
+      details: `New account registered: ${newUser.email}`,
+      req,
+    });
+
     return res.status(201).json({
       message: "Registered successfully",
       accessToken,
@@ -124,6 +133,14 @@ const login = async (req, res) => {
       requestId: req.id,
       userId: user.id,
       role: user.role,
+    });
+
+    await auditLogger({
+      userId: user.id,
+      action: "LOGIN",
+      module: "auth",
+      details: `User logged in: ${user.email}`,
+      req,
     });
 
     return res.status(200).json({
@@ -201,6 +218,15 @@ const logout = async (req, res) => {
       }
     }
     logger.info("Logout successful", { requestId: req.id });
+
+    await auditLogger({
+      userId: req.user && req.user.id ? req.user.id : undefined,
+      action: "LOGOUT",
+      module: "auth",
+      details: "User logged out",
+      req,
+    });
+
     return res.json({ success: true, message: "Logged out" });
   } catch (error) {
     logError(req, "Logout failed", error);

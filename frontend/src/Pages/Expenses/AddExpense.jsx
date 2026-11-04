@@ -47,6 +47,8 @@ const AddExpense = () => {
 
       setData({ ...initialData, date: todayISO() });
       toast.success(response.data.message || "Expense added successfully");
+      // Signal any open dashboard tab to refresh its data.
+      window.dispatchEvent(new CustomEvent("transactions:changed"));
     } catch (error) {
       console.log("Add expense error:", error);
       toast.error(error.response?.data?.message || "Could not save the expense");
