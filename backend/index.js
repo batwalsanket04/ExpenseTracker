@@ -9,6 +9,7 @@ const { logger, serializeError, logError } = require("./config/logger");
 const { requestLogger } = require("./middleware/requestLogger");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
 const { runMigrations } = require("./config/runMigrations");
+const { startAll: startCrons } = require("./crons");
 
 const PORT = process.env.PORT || 5000;
 
@@ -73,6 +74,9 @@ const startServer = async () => {
     // Run pending migrations (creates/updates tables)
     await runMigrations();
     logger.info("Database migrations executed");
+
+    // Start scheduled cron jobs (no-op when CRON_ENABLED=false).
+    startCrons();
 
     app.listen(PORT, "0.0.0.0", () => {
       logger.info("Server started", {
