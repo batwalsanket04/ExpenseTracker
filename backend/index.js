@@ -21,6 +21,7 @@ const budgetRoute = require("./routes/budget.route");
 const budgetPreferenceRoute = require("./routes/budgetPreference.route");
 const notificationPreferenceRoute = require("./routes/notificationPreference.route");
 const notificationRoute = require("./routes/notification.route");
+const auditRoute = require("./routes/audit.route");
 
 // Middleware
 app.use(requestLogger);
@@ -59,6 +60,7 @@ app.use("/api/budget", budgetRoute);
 app.use("/api/budget-preferences", budgetPreferenceRoute);
 app.use("/api/notification-preferences", notificationPreferenceRoute);
 app.use("/api/notifications", notificationRoute);
+app.use("/api/audit", auditRoute);
 
 // 404 + final error boundary
 app.use(notFoundHandler);
@@ -68,7 +70,17 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     await connectDB(); // authenticate PostgreSQL
-    await redis.connect(); // connect Redis
+
+    // Connect Redis, but never let a missing/unreachable Redis instance
+    // prevent the API (and login) from starting. Refresh-token caching
+    // degrades gracefully when Redis is unavailable.
+    try {
+      await redis.connect();
+    } catch (error) {
+      logger.warn("Redis unavailable, continuing without cache", {
+        error: error.message,
+      });
+    }
 
     // Run pending migrations (creates/updates tables)
     await runMigrations();

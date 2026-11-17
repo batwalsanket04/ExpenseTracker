@@ -25,6 +25,15 @@ module.exports = (sequelize) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
+      // Structured before/after values for field-level changes (stored as JSON text)
+      previousValue: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      newValue: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
       ip: {
         type: DataTypes.STRING,
         allowNull: true,

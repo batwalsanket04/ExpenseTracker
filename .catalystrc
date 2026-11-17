@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "project": 1,
+    "env": 1
+  },
+  "actives": {
+    "project": 1,
+    "env": 1
+  },
+  "projects": [
+    {
+      "idx": 1,
+      "id": "89209000000013074",
+      "name": "expense-tracker",
+      "domain": {
+        "id": "50047722343",
+        "name": "expense-tracker-60096524030.development"
+      },
+      "timezone": "Asia/Kolkata",
+      "env": [
+        {
+          "idx": 1,
+          "id": "60096524030",
+          "name": "Development",
+          "type": 3
+        }
+      ]
+    }
+  ]
+}

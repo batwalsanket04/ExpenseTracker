@@ -9,6 +9,8 @@ import {
   Clock,
   Database,
   Download,
+  Eye,
+  EyeOff,
   FileText,
   Filter,
   KeyRound,
@@ -317,7 +319,7 @@ const AdminPanel = () => {
       downloadCsv(`expense-tracker-audit-logs-${todayISO()}.csv`, [
         ["Time", "Action", "Actor", "Target", "Amount (INR)", "Type"],
         ...logs.map((log) => [
-          log.date ? new Date(log.date).toISOString() : "",
+          log.createdAt ? new Date(log.createdAt).toISOString() : "",
           log.action,
           log.actor,
           log.target,
@@ -1892,6 +1894,21 @@ const AuditLogsSection = ({ onExport }) => {
   const [actionOptions, setActionOptions] = useState(["all"]);
   const [moduleOptions, setModuleOptions] = useState(["all"]);
   const [loading, setLoading] = useState(true);
+  const [expandedLogId, setExpandedLogId] = useState(null);
+
+  const toggleDetail = (id) => {
+    setExpandedLogId(expandedLogId === id ? null : id);
+  };
+
+  const formatJson = (value) => {
+    if (value === null || value === undefined) return "—";
+    try {
+      const parsed = typeof value === "string" ? JSON.parse(value) : value;
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return String(value);
+    }
+  };
 
   const fetchUserMap = async () => {
     try {
@@ -1948,8 +1965,12 @@ const AuditLogsSection = ({ onExport }) => {
         "all",
         ...[...new Set(pageLogs.map((log) => log.module).filter(Boolean))].sort(),
       ];
-      setActionOptions(dynamicActions);
-      setModuleOptions(dynamicModules);
+
+      // Always include credit/income filter options even when no credit logs exist yet
+      const creditActions = ["CREDIT_CREATE", "CREDIT_UPDATE", "CREDIT_DELETE"];
+      const creditModules = ["credit"];
+      setActionOptions([...new Set([...dynamicActions, ...creditActions])]);
+      setModuleOptions([...new Set([...dynamicModules, ...creditModules])]);
 
       setPagination((prev) => ({
         ...prev,
@@ -1986,7 +2007,7 @@ const AuditLogsSection = ({ onExport }) => {
       downloadCsv(`expense-tracker-audit-logs-${todayISO()}.csv`, [
         ["Time", "Action", "Actor", "Target", "Amount (INR)", "Type"],
         ...all.map((log) => [
-          log.date ? new Date(log.date).toISOString() : "",
+          log.createdAt ? new Date(log.createdAt).toISOString() : "",
           log.action,
           log.actor,
           log.target,
@@ -2171,35 +2192,108 @@ const AuditLogsSection = ({ onExport }) => {
                   <th>Target</th>
                   <th className="text-right">Amount</th>
                   <th className="text-right">Type</th>
+                  <th>Details</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log) => (
-                  <tr key={log.id}>
-                    <td className="whitespace-nowrap text-[11px] text-slate-500">
-                      {formatDateTime(log.date)}
-                    </td>
-                    <td className="whitespace-nowrap text-[13px] font-semibold text-slate-800">
-                      {log.action}
-                    </td>
-                    <td className="whitespace-nowrap text-xs text-slate-500">
-                      {log.module}
-                    </td>
-                    <td className="whitespace-nowrap text-xs text-slate-600">
-                      {log.actor}
-                    </td>
-                    <td className="max-w-[220px] truncate text-xs text-slate-600">
-                      {log.details || log.target || "—"}
-                    </td>
-                    <td className="whitespace-nowrap text-right text-xs font-bold text-slate-700">
-                      {formatMoney(log.amount)}
-                    </td>
-                    <td className="text-right">
-                      <Badge tone={log.type === "Expense" ? "rose" : "emerald"}>
-                        {log.type || "—"}
-                      </Badge>
-                    </td>
-                  </tr>
+                  <>
+                    <tr key={log.id}>
+                      <td className="whitespace-nowrap text-[11px] text-slate-500">
+                        {formatDateTime(log.createdAt)}
+                      </td>
+                      <td className="whitespace-nowrap text-[13px] font-semibold text-slate-800">
+                        {log.action}
+                      </td>
+                      <td className="whitespace-nowrap text-xs text-slate-500">
+                        {log.module}
+                      </td>
+                      <td className="whitespace-nowrap text-xs text-slate-600">
+                        {log.actor}
+                      </td>
+                      <td className="max-w-[220px] truncate text-xs text-slate-600">
+                        {log.details || log.target || "—"}
+                      </td>
+                      <td className="whitespace-nowrap text-right text-xs font-bold text-slate-700">
+                        {formatMoney(log.amount)}
+                      </td>
+                      <td className="text-right">
+                        <Badge tone={log.type === "Expense" ? "rose" : "emerald"}>
+                          {log.type || "—"}
+                        </Badge>
+                      </td>
+                      <td className="text-center">
+                        <button
+                          type="button"
+                          onClick={() => toggleDetail(log.id)}
+                          className="p-1 text-slate-400 hover:text-teal-600 focus:outline-none"
+                          aria-label={expandedLogId === log.id ? "Hide details" : "Show details"}
+                        >
+                          {expandedLogId === log.id ? (
+                            <EyeOff size={14} />
+                          ) : (
+                            <Eye size={14} />
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedLogId === log.id && (
+                      <tr key={`${log.id}-detail`}>
+                        <td colSpan={8}>
+                          <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="text-[10px] font-semibold uppercase text-slate-500">
+                                Change details
+                              </span>
+                              {log.previousValue !== null && log.previousValue !== undefined && (
+                                <span className="text-[10px] text-rose-600 font-semibold">Previous</span>
+                              )}
+                              {log.newValue !== null && log.newValue !== undefined && (
+                                <span className="text-[10px] text-emerald-600 font-semibold">New</span>
+                              )}
+                            </div>
+                            <div className="grid gap-2">
+                              {log.previousValue !== null && log.previousValue !== undefined && (
+                                <div>
+                                  <div className="text-[10px] text-rose-600 font-semibold mb-1">
+                                    Previous value
+                                  </div>
+                                  <pre className="text-[10px] text-rose-700 bg-rose-50 p-2 rounded border border-rose-100 overflow-x-auto whitespace-pre-wrap break-words">
+                                    {formatJson(log.previousValue)}
+                                  </pre>
+                                </div>
+                              )}
+                              {log.newValue !== null && log.newValue !== undefined && (
+                                <div>
+                                  <div className="text-[10px] text-emerald-600 font-semibold mb-1">
+                                    New value
+                                  </div>
+                                  <pre className="text-[10px] text-emerald-700 bg-emerald-50 p-2 rounded border border-emerald-100 overflow-x-auto whitespace-pre-wrap break-words">
+                                    {formatJson(log.newValue)}
+                                  </pre>
+                                </div>
+                              )}
+                              {(!log.previousValue && !log.newValue) && (
+                                <p className="text-[11px] text-slate-400 italic">
+                                  No field-level change data recorded for this action.
+                                </p>
+                              )}
+                              {log.details && (
+                                <div className="mt-3">
+                                  <div className="text-[10px] text-slate-500 font-semibold mb-1">
+                                    Details
+                                  </div>
+                                  <pre className="text-[10px] text-slate-700 bg-white p-2 rounded border border-slate-100 overflow-x-auto whitespace-pre-wrap break-words">
+                                    {formatJson(log.details)}
+                                  </pre>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>
@@ -2209,26 +2303,87 @@ const AuditLogsSection = ({ onExport }) => {
             {logs.map((log) => (
               <div key={log.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-semibold text-slate-800">
                       {log.action}
                     </p>
                     <p className="mt-0.5 text-[10.5px] text-slate-500">
-                      {log.actor} · {formatDateTime(log.date)}
+                      {log.actor} · {formatDateTime(log.createdAt)}
                     </p>
                     <p className="mt-1 truncate text-[11px] text-slate-400">
                       {log.details || log.target || "—"}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <Badge tone={log.type === "Expense" ? "rose" : "emerald"}>
-                      {log.type || "—"}
-                    </Badge>
-                    <p className="mt-1 text-[11px] font-bold text-slate-700">
-                      {formatMoney(log.amount)}
-                    </p>
+                  <div className="flex flex-col items-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleDetail(log.id)}
+                      className="p-1 text-slate-400 hover:text-teal-600 focus:outline-none"
+                      aria-label={expandedLogId === log.id ? "Hide details" : "Show details"}
+                    >
+                      {expandedLogId === log.id ? (
+                        <EyeOff size={14} />
+                      ) : (
+                        <Eye size={14} />
+                      )}
+                    </button>
+                    <div className="text-right">
+                      <Badge tone={log.type === "Expense" ? "rose" : "emerald"}>
+                        {log.type || "—"}
+                      </Badge>
+                      <p className="mt-1 text-[11px] font-bold text-slate-700">
+                        {formatMoney(log.amount)}
+                      </p>
+                    </div>
                   </div>
                 </div>
+                {expandedLogId === log.id && (
+                  <div className="mt-4 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] font-semibold uppercase text-slate-500">
+                        Change details
+                      </span>
+                      {log.previousValue !== null && log.previousValue !== undefined && (
+                        <span className="text-[10px] text-rose-600 font-semibold">Previous</span>
+                      )}
+                      {log.newValue !== null && log.newValue !== undefined && (
+                        <span className="text-[10px] text-emerald-600 font-semibold">New</span>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {log.previousValue !== null && log.previousValue !== undefined && (
+                        <div>
+                          <div className="text-[10px] text-rose-600 font-semibold">
+                            Previous value
+                          </div>
+                          <pre className="text-[10px] text-rose-700 bg-rose-50 p-2 rounded border border-rose-100 overflow-x-auto whitespace-pre-wrap break-words">
+                            {formatJson(log.previousValue)}
+                          </pre>
+                        </div>
+                      )}
+                      {log.newValue !== null && log.newValue !== undefined && (
+                        <div>
+                          <div className="text-[10px] text-emerald-600 font-semibold">
+                            New value
+                          </div>
+                          <pre className="text-[10px] text-emerald-700 bg-emerald-50 p-2 rounded border border-emerald-100 overflow-x-auto whitespace-pre-wrap break-words">
+                            {formatJson(log.newValue)}
+                          </pre>
+                        </div>
+                      )}
+                      {log.details && (
+                        <div>
+                          <div className="text-[10px] text-slate-500 font-semibold">
+                            Details
+                          </div>
+                          <pre className="text-[10px] text-slate-700 bg-white p-2 rounded border border-slate-100 overflow-x-auto whitespace-pre-wrap break-words">
+                            {formatJson(log.details)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
