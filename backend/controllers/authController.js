@@ -64,12 +64,19 @@ const register = async (req, res) => {
 
     const accessToken = generateAccessToken(newUser);
     const refreshToken = generateRefreshToken(newUser);
-    await redis.set(
-      `refresh:${newUser.id}`,
-      refreshToken,
-      "EX",
-      REFRESH_TTL_SECONDS
-    );
+    try {
+      await redis.set(
+        `refresh:${newUser.id}`,
+        refreshToken,
+        "EX",
+        REFRESH_TTL_SECONDS
+      );
+    } catch (err) {
+      logger.warn("Redis unavailable, refresh token not cached", {
+        userId: newUser.id,
+        error: err.message,
+      });
+    }
 
     logger.info("User registered", {
       requestId: req.id,
@@ -122,12 +129,19 @@ const login = async (req, res) => {
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
-    await redis.set(
-      `refresh:${user.id}`,
-      refreshToken,
-      "EX",
-      REFRESH_TTL_SECONDS
-    );
+    try {
+      await redis.set(
+        `refresh:${user.id}`,
+        refreshToken,
+        "EX",
+        REFRESH_TTL_SECONDS
+      );
+    } catch (err) {
+      logger.warn("Redis unavailable, refresh token not cached", {
+        userId: user.id,
+        error: err.message,
+      });
+    }
 
     logger.info("Login successful", {
       requestId: req.id,
@@ -176,7 +190,17 @@ const refreshToken = async (req, res) => {
         .json({ message: "Invalid or expired refresh token" });
     }
 
-    const stored = await redis.get(`refresh:${decoded.id}`);
+    const stored = await (async () => {
+      try {
+        return await redis.get(`refresh:${decoded.id}`);
+      } catch (err) {
+        logger.warn("Redis unavailable, cannot verify refresh token", {
+          userId: decoded.id,
+          error: err.message,
+        });
+        return null;
+      }
+    })();
     if (stored !== refreshToken) {
       return res.status(401).json({ message: "Refresh token revoked" });
     }
@@ -212,7 +236,14 @@ const logout = async (req, res) => {
           refreshToken,
           process.env.JWT_REFRESH_SECRET
         );
-        await redis.del(`refresh:${decoded.id}`);
+        try {
+          await redis.del(`refresh:${decoded.id}`);
+        } catch (err) {
+          logger.warn("Redis unavailable, could not delete refresh token", {
+            userId: decoded.id,
+            error: err.message,
+          });
+        }
       } catch (err) {
         // token malformed; ignore
       }

@@ -1,6 +1,7 @@
 const { Expense, User } = require("../models");
 const { logError } = require("../config/logger");
 const { Op } = require("sequelize");
+const { auditLogger } = require("../middleware/auditLogger");
 
 const ALLOWED_CATEGORIES = [
   "Food",
@@ -33,6 +34,22 @@ const addExpense = async (req, res) => {
       category: normalizedCategory,
       date: date || new Date(),
       note: note || "",
+    });
+
+    await auditLogger({
+      userId,
+      action: "EXPENSE_CREATE",
+      module: "expense",
+      details: `Created expense: ${title}`,
+      req,
+      newValue: {
+        id: newExpense.id,
+        title,
+        amount,
+        category: normalizedCategory,
+        date: newExpense.date,
+        note: newExpense.note,
+      },
     });
 
     return res.status(201).json({
@@ -227,7 +244,18 @@ const deleteExpense = async (req, res) => {
     if (req.user.role !== "admin" && expense.userId !== req.user.id) {
       return res.status(403).json({ message: "Forbidden: not your expense" });
     }
+    const previous = expense.toJSON();
     await expense.destroy();
+
+    await auditLogger({
+      userId: req.user.id,
+      action: "EXPENSE_DELETE",
+      module: "expense",
+      details: `Deleted expense: ${previous.title}`,
+      req,
+      previousValue: previous,
+    });
+
     return res.status(200).json({ message: "Expense deleted successfully" });
   } catch (error) {
     logError(req, "Delete expense failed", error);
@@ -245,8 +273,34 @@ const updateExpense = async (req, res) => {
     if (req.user.role !== "admin" && expense.userId !== req.user.id) {
       return res.status(403).json({ message: "Forbidden: not your expense" });
     }
+    const previous = expense.toJSON();
     await expense.update(req.body);
     const updated = await Expense.findByPk(id);
+
+    await auditLogger({
+      userId: req.user.id,
+      action: "EXPENSE_UPDATE",
+      module: "expense",
+      details: `Updated expense: ${updated.title}`,
+      req,
+      previousValue: {
+        id: previous.id,
+        title: previous.title,
+        amount: previous.amount,
+        category: previous.category,
+        date: previous.date,
+        note: previous.note,
+      },
+      newValue: {
+        id: updated.id,
+        title: updated.title,
+        amount: updated.amount,
+        category: updated.category,
+        date: updated.date,
+        note: updated.note,
+      },
+    });
+
     return res.status(200).json({
       message: "Expense updated successfully",
       updated,
