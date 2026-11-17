@@ -1,0 +1,10 @@
+{
+  "build": {
+    "commands": [
+      "npm install"
+    ]
+  },
+  "run": {
+    "command": "npm start"
+  }
+}
