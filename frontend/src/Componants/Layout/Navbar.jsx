@@ -47,15 +47,16 @@ const Navbar = ({ onMenuClick }) => {
     month: "short",
   });
 
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await api.get("/notifications/unread-count");
+      setUnreadCount(res.data.unreadCount || 0);
+    } catch (error) {
+      // Silently ignore; notifications may not be available yet.
+    }
+  };
+
   useEffect(() => {
-    const fetchUnreadCount = async () => {
-      try {
-        const res = await api.get("/notifications/unread-count");
-        setUnreadCount(res.data.unreadCount || 0);
-      } catch (error) {
-        // Silently ignore; notifications may not be available yet.
-      }
-    };
     fetchUnreadCount();
   }, []);
 
